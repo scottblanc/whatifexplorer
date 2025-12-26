@@ -2,163 +2,130 @@
 
 ## Vision
 
-What If Explorer is a web-based tool that transforms natural language questions about cause-and-effect relationships into interactive, explorable causal graphs. Users describe what they want to understand, and the system generates a Structural Causal Model (SCM) they can manipulate through interventions to observe downstream effects.
+What If Explorer lets anyone explore cause-and-effect relationships through an interactive visual interface. You describe what you want to understand—"How does the Fed's interest rate policy affect inflation and unemployment?"—and the system generates a causal model you can manipulate to see how changes propagate through the system.
+
+The core insight is that understanding causality requires interaction, not just observation. A static diagram shows you that A causes B causes C. But what happens if you force A to a specific value? How much does C change? What if there are multiple paths? Static diagrams can't answer these questions; interactive simulation can.
 
 ## Problem Statement
 
-Understanding causal relationships in complex systems (economics, healthcare, policy) is difficult because:
+Understanding causal relationships in complex systems—economics, healthcare, policy, business—is genuinely hard:
 
-1. Mental models are limited - humans struggle to trace multi-step causal chains
-2. Interventions have unintended consequences that are hard to predict
-3. Existing tools require statistical expertise to build and interpret causal models
-4. Static diagrams don't show how changes propagate through a system
+**Mental models break down** beyond a few variables. Humans can trace "A affects B affects C" but struggle with "A affects B and D, B affects C and E, D affects C with a threshold effect, and E feeds back to B." Real systems have these structures.
 
-What If Explorer solves this by letting anyone explore "what if?" scenarios through an intuitive visual interface.
+**Interventions have unintended consequences.** A policy designed to reduce unemployment might increase inflation, or might trigger second-order effects through confidence channels that dwarf the direct effect. Without simulation, these are invisible.
+
+**Existing tools require expertise.** Statistical causal inference packages (DoWhy, Ananke) assume you can write code and understand concepts like d-separation. Most people who need causal reasoning can't use these tools.
+
+**Static diagrams are inert.** Textbook causal diagrams show structure but not dynamics. You can't ask "what if?" and get an answer.
+
+What If Explorer addresses this by combining LLM-powered model generation (no coding required) with real-time Monte Carlo simulation (instant feedback on interventions).
 
 ## Target Users
 
-| User Type | Need | How What If Explorer Helps |
-|-----------|------|----------------------|
-| Policy Analyst | Understand intervention effects | Simulate policy changes, see downstream impacts |
-| Business Strategist | Model market dynamics | Explore competitive scenarios, identify leverage points |
-| Student | Learn causal reasoning | Interactive exploration beats static textbook diagrams |
-| Researcher | Rapid prototyping | Quickly sketch causal hypotheses before formal analysis |
+**Policy analysts** evaluating intervention effects—what happens if we raise the minimum wage, increase housing supply, or change immigration policy? They need to explore scenarios quickly, not build formal econometric models.
 
-## Core User Flow
+**Business strategists** modeling market dynamics—how do pricing changes affect demand, competitor response, and long-term market position? They think in terms of causal stories but lack tools to formalize and test them.
 
-```
-User enters question → LLM generates causal model → Graph renders → User intervenes → Effects propagate
-```
+**Students learning causal reasoning**—seeing the Phillips curve as an interactive model where you can set unemployment and watch inflation respond is more instructive than memorizing the equation.
 
-**Example:**
-- Input: "How does the Federal Reserve's interest rate policy affect inflation and unemployment?"
-- Output: Interactive DAG with nodes for Fed rate, money supply, inflation, unemployment, GDP, etc.
-- Interaction: User sets Fed rate to 7%, watches inflation decrease and unemployment rise
+**Researchers** rapidly prototyping causal hypotheses before investing in formal analysis. "Does this causal structure even make sense?" is faster to answer with visualization than with code.
+
+## Core Interaction Model
+
+The workflow is: **Query → Generate → Explore → Intervene → Learn**
+
+1. User types a causal question in natural language
+2. LLM generates a Structural Causal Model (nodes, edges, distributions, effects)
+3. Graph renders with a hierarchical layout showing causes and effects
+4. User clicks nodes to understand them, sees probability distributions and causal context
+5. User sets intervention values ("set interest rate to 7%")
+6. Effects propagate through the graph via Monte Carlo simulation
+7. User sees downstream distributions shift and draws conclusions
+
+The "aha moment" is when a user sets an intervention and watches the entire downstream graph update. That's when the causal structure becomes tangible.
 
 ## Feature Requirements
 
-### P0: Must Have (MVP)
+### Core Features (MVP)
 
-1. **Natural Language Query Input**
-   - Text field for causal questions
-   - Generate button triggers LLM call
-   - Loading state during generation
+**Natural Language Input**
+Users shouldn't need to know what a "node" or "edge" is. They type a question, click Generate, and get a model. The LLM handles translation to formal structure.
 
-2. **Graph Visualization**
-   - DAG layout with clear directional flow
-   - Nodes grouped by thematic zones (color-coded)
-   - Different shapes for node types (exogenous, endogenous, terminal, gatekeeper)
-   - Edges showing causal relationships
+**Graph Visualization**
+The graph must be immediately readable: causes flow into effects top-to-bottom, related variables are grouped by color, and node shapes indicate roles (inputs vs. outputs vs. intermediates). Users should understand the causal story within seconds.
 
-3. **Node Inspection**
-   - Click node to view details
-   - Show description, distribution type, current mean
-   - Display parent nodes (what affects this) and child nodes (what this affects)
+**Node Inspection**
+Clicking a node reveals its description (what the variable represents), its probability distribution (visualized as a density curve), and its causal context (what affects it, what it affects). This is where users build understanding before intervening.
 
-4. **Interventions (do-operator)**
-   - Slider to set node value
-   - "Set Value" button to apply intervention
-   - Visual indicator on intervened nodes (glow effect)
-   - "Clear" button to remove intervention
+**Interventions (do-operator)**
+The slider-and-button interaction implements Pearl's do-operator. Setting a value says "pretend this variable is exactly X, regardless of its causes." The button click triggers propagation—all downstream distributions update to reflect the intervention.
 
-5. **Effect Propagation**
-   - Monte Carlo sampling for probabilistic propagation
-   - Updates propagate through all descendants
-   - Distribution charts update in real-time
+**Effect Propagation**
+Monte Carlo sampling makes propagation intuitive. Each node has 100 samples. Interventions fix those samples to a constant. Downstream samples are computed from upstream samples via effect functions. The resulting distributions answer "what would happen if?"
 
-### P1: Should Have
+### Extended Features
 
-1. **Distribution Visualization**
-   - Density curves (KDE) for each node
-   - Percentile markers (p5, p50, p95)
-   - Intervention line overlay
+**Distribution Visualization**
+Beyond showing mean values, density curves communicate uncertainty. A tight distribution means we're confident; a wide one means outcomes vary. Percentile markers (5th, 50th, 95th) give users concrete "best case / expected / worst case" framings.
 
-2. **Key Insights Panel**
-   - LLM-generated insights about the causal structure
-   - Highlights important relationships and bottlenecks
+**Key Insights Panel**
+The LLM generates textual insights alongside the model: "Interest rates have the strongest effect on housing prices, primarily through the mortgage cost channel" or "There are two paths from Fed policy to unemployment—direct through business investment, and indirect through inflation expectations." These guide exploration.
 
-3. **Graph Validation**
-   - Ensure graph is connected (no isolated nodes)
-   - Fix node types based on structure (terminals have no children)
-   - Prevent cycles
-
-### P2: Nice to Have
-
-1. **Counterfactual Mode**
-   - Compare two scenarios side-by-side
-   - Overlay "actual" vs "counterfactual" distributions
-   - Delta report showing differences
-
-2. **Animation**
-   - Ripple effect when interventions propagate
-   - Distribution morphing between states
-
-3. **Export/Share**
-   - Save model as JSON
-   - Share link to specific configuration
-
-## Interaction Modes
-
-### Observe Mode (Default)
-- View causal structure
-- Hover nodes for descriptions
-- Click edges for relationship details
-
-### Intervene Mode
-- Click node to select
-- Set value via slider or input
-- Apply intervention to see effects
-- Clear individual or all interventions
+**Model Validation**
+The system catches and repairs common LLM errors: disconnected subgraphs get linked, node types get corrected based on structure, and obviously invalid configurations are rejected with helpful errors.
 
 ## Node Types and Shapes
 
-| Type | Shape | Description |
-|------|-------|-------------|
-| Exogenous | Parallelogram | External inputs with no parents |
-| Endogenous | Rounded rectangle | Intermediate variables |
-| Terminal | Hard-corner rectangle | Final outcomes with no children |
-| Gatekeeper | Octagon | Filters/transforms information flow |
+Shapes communicate semantics without requiring users to read labels:
+
+**Parallelograms** are external inputs—variables that affect the system but aren't explained by it. Interest rates set by the Fed, natural disasters, policy changes. These are the levers users can pull.
+
+**Rounded rectangles** are interior variables—they have causes and effects. GDP, consumer confidence, business investment. These sit in the middle of causal chains.
+
+**Hard rectangles** are terminal outcomes—the endpoints we ultimately care about. Employment levels, inflation rates, poverty rates. These have causes but no downstream effects in the model.
+
+**Octagons** are gatekeepers—variables that filter or transform information flow, like "crisis threshold" nodes that activate only under extreme conditions.
 
 ## Distribution Types
 
-| Variable Type | Distribution | Example |
-|--------------|--------------|---------|
-| Continuous symmetric | Normal | GDP growth rate |
-| Continuous positive | Lognormal | Prices, income |
-| Bounded percentage | Bounded | Unemployment rate (0-100%) |
-| Rates/proportions | Beta | Mortality rate |
-| Counts | Poisson | Number of events |
+The LLM chooses appropriate distributions for each variable:
+
+**Normal** for symmetric variables that can be positive or negative: GDP growth rate, temperature change, sentiment scores.
+
+**Lognormal** for positive-only variables with right skew: prices, incomes, firm sizes. These can't go below zero and have long right tails.
+
+**Bounded** for percentages and rates constrained to a range: unemployment (0-100%), conversion rates, capacity utilization.
+
+**Beta** for proportions with flexible shapes: probability of events, market shares, compliance rates.
 
 ## Effect Types
 
-| Relationship | Effect Type | Example |
-|--------------|-------------|---------|
-| Direct proportional | Linear (positive) | Higher investment → Higher GDP |
-| Inverse relationship | Linear (negative) | Higher rates → Lower borrowing |
-| Scaling factor | Multiplicative | Confidence amplifies spending |
-| Trigger/gate | Threshold | Crisis only triggers above X |
+Edges carry effect functions that transform how parent values influence children:
 
-## Success Metrics
+**Linear** for direct proportional effects: "A 1% increase in interest rates reduces mortgage applications by X%." These are the bread and butter of causal models.
 
-1. **Usability**: Users can generate and explore a model in < 2 minutes
-2. **Correctness**: Propagation produces realistic distributions (no explosions/collapses)
-3. **Performance**: Interventions update in < 100ms
-4. **Engagement**: Users make 3+ interventions per session
+**Multiplicative** for scaling effects: "Consumer confidence doesn't add to spending, it multiplies it." These capture amplification and dampening.
 
-## Future Roadmap
+**Threshold** for regime changes: "Below 5% unemployment, inflation accelerates. Above 5%, it's stable." These model tipping points and phase transitions.
 
-### Milestone 1: Counterfactual Toggle
-- Compare "actual" vs "what if" scenarios
-- Dual distribution overlays
-- LLM-generated comparison narrative
+**Logistic** for probability effects: "Each point of economic stress increases the probability of crisis by X%." These are for binary outcomes.
 
-### Milestone 2: Temporal Dynamics
-- Support for feedback loops
-- Discrete time simulation with decay
-- Convergence detection
-- Playback controls for time evolution
+## Success Criteria
 
-### Milestone 3: Collaborative Features
-- Save and share models
-- Template library for common domains
-- Annotation and commenting
+**Usability**: A user with no causal inference background can generate and meaningfully explore a model in under 3 minutes.
+
+**Correctness**: Interventions produce plausible distributions—no explosions (infinite values), no collapses (zero variance), no violations of physical constraints.
+
+**Performance**: Intervention updates feel instant (<100ms). Model generation is acceptable with loading feedback (<10s typical).
+
+**Insight**: Users report learning something non-obvious about the causal system—an effect they didn't expect, a pathway they hadn't considered, or a sensitivity they underestimated.
+
+## Future Directions
+
+**Counterfactual comparison**: Split-screen view showing "actual" vs. "what if" distributions. "If interest rates had been 2% instead of 5%, unemployment would have been 4.2% instead of 6.1%."
+
+**Temporal dynamics**: Currently the model is static—one point in time. Temporal models would show how systems evolve: feedback loops, convergence, oscillations.
+
+**Collaborative features**: Save models, share links, build template libraries for common domains (macroeconomics, epidemiology, marketing funnels).
+
+**Model editing**: Let users modify the LLM-generated model—add nodes, remove edges, adjust effect strengths—to test alternative causal theories.
