@@ -1,6 +1,6 @@
 # What If Explorer
 
-![What If Explorer Screenshot](docs/assets/screenshot.png)
+![What If Explorer Screenshot](docs/images/app-screenshot.png)
 
 An interactive web tool that transforms natural language questions into explorable causal graphs. Describe a cause-and-effect relationship you want to understand, and the system generates a Structural Causal Model (SCM) you can manipulate through interventions.
 
