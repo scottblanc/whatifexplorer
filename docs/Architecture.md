@@ -6,29 +6,24 @@ What If Explorer is a client-side web application that generates and visualizes 
 
 ![System Overview](./images/system-overview.png)
 
-<!--
-```mermaid
-flowchart LR
-    subgraph Client["Browser (Next.js)"]
-        UI[React Components]
-        Store[Zustand Store]
-        Inference[Inference Engine]
-        Viz[D3.js Visualization]
-    end
+### Architecture Components
 
-    subgraph External["External Services"]
-        LLM[Gemini API]
-    end
+**Browser (Next.js)**
+- React Components - UI layer
+- Zustand Store - State management
+- Inference Engine - Monte Carlo propagation
+- D3.js Visualization - Graph rendering
 
-    User([User]) --> UI
-    UI --> Store
-    Store --> Inference
-    Inference --> Store
-    Store --> Viz
-    UI --> LLM
-    LLM --> UI
-```
--->
+**External Services**
+- Gemini API - LLM for model generation
+
+### Data Connections
+- User interacts with React Components
+- Components read/write to Zustand Store
+- Store triggers Inference Engine on changes
+- Inference Engine updates Store with computed distributions
+- Store changes trigger D3.js Visualization updates
+- Components call Gemini API for model generation
 
 ## Data Flow
 
@@ -36,33 +31,27 @@ The application follows a unidirectional data flow pattern. User actions trigger
 
 ![Data Flow](./images/data-flow.png)
 
-<!--
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant Q as QueryInput
-    participant L as LLM API
-    participant S as Zustand Store
-    participant I as Inference Engine
-    participant G as Graph Viz
+### Flow 1: Model Generation
+| Step | From | To | Action |
+|------|------|-----|--------|
+| 1 | User | QueryInput | Enter causal question |
+| 2 | QueryInput | LLM API | Generate model request |
+| 3 | LLM API | QueryInput | Return causal model JSON |
+| 4 | QueryInput | Zustand Store | setModel(model) |
+| 5 | Zustand Store | Inference Engine | recompute() |
+| 6 | Inference Engine | Zustand Store | Return samples + distributions |
+| 7 | Zustand Store | Graph Viz | Trigger re-render |
+| 8 | Graph Viz | User | Display graph |
 
-    U->>Q: Enter causal question
-    Q->>L: Generate model request
-    L-->>Q: Causal model JSON
-    Q->>S: setModel(model)
-    S->>I: recompute()
-    I-->>S: samples + distributions
-    S->>G: Trigger re-render
-    G-->>U: Display graph
-
-    U->>G: Click node
-    G->>S: selectNode(id)
-    U->>S: setIntervention(id, value)
-    S->>I: recompute()
-    I-->>S: Updated distributions
-    S->>G: Trigger re-render
-```
--->
+### Flow 2: Intervention
+| Step | From | To | Action |
+|------|------|-----|--------|
+| 1 | User | Graph Viz | Click node |
+| 2 | Graph Viz | Zustand Store | selectNode(id) |
+| 3 | User | Zustand Store | setIntervention(id, value) |
+| 4 | Zustand Store | Inference Engine | recompute() |
+| 5 | Inference Engine | Zustand Store | Return updated distributions |
+| 6 | Zustand Store | Graph Viz | Trigger re-render |
 
 ## Component Architecture
 
@@ -70,69 +59,51 @@ The frontend is organized into presentation components, a centralized store, and
 
 ![Component Architecture](./images/component-architecture.png)
 
-<!--
-```mermaid
-graph TB
-    subgraph Pages["Pages (App Router)"]
-        Home[page.tsx]
-    end
+### Pages (App Router)
+- `page.tsx` - Main page layout, renders all components
 
-    subgraph Components["React Components"]
-        CG[CausalGraph]
-        NI[NodeInspector]
-        QI[QueryInput]
-        DC[DistributionChart]
-        IP[InsightsPanel]
-    end
+### React Components
+| Component | Purpose | Dependencies |
+|-----------|---------|--------------|
+| CausalGraph | D3 graph visualization | graphStore |
+| NodeInspector | Node details panel | graphStore |
+| QueryInput | Query input form | llm.ts |
+| DistributionChart | KDE visualization (child of NodeInspector) | - |
+| InsightsPanel | Key insights display | graphStore |
 
-    subgraph Store["State Management"]
-        ZS[graphStore.ts]
-    end
+### State Management
+- `graphStore.ts` - Zustand store for all application state
 
-    subgraph Logic["Pure Logic"]
-        INF[inference.ts]
-        DIST[distributions.ts]
-        LLM[llm.ts]
-    end
-
-    Home --> CG
-    Home --> NI
-    Home --> QI
-    Home --> IP
-    NI --> DC
-
-    CG --> ZS
-    NI --> ZS
-    QI --> LLM
-    LLM --> ZS
-    ZS --> INF
-    INF --> DIST
-```
--->
+### Pure Logic Modules
+| Module | Purpose | Dependencies |
+|--------|---------|--------------|
+| inference.ts | Monte Carlo propagation | distributions.ts |
+| distributions.ts | Probability distributions, KDE | - |
+| llm.ts | Gemini API integration + validation | graphStore |
 
 ## State Management
 
 Zustand provides a simple, centralized store for all application state. The store holds the causal model, intervention state, and computed distributions.
 
-<!--
-```mermaid
-stateDiagram-v2
-    [*] --> Empty: App loads
-    Empty --> Loading: User submits query
-    Loading --> ModelLoaded: LLM returns model
-    ModelLoaded --> Computing: Intervention changed
-    Computing --> ModelLoaded: Propagation complete
-    ModelLoaded --> Loading: New query submitted
-```
--->
+### State Machine
+
+| State | Transition | Next State |
+|-------|------------|------------|
+| (initial) | App loads | Empty |
+| Empty | User submits query | Loading |
+| Loading | LLM returns model | ModelLoaded |
+| ModelLoaded | Intervention changed | Computing |
+| Computing | Propagation complete | ModelLoaded |
+| ModelLoaded | New query submitted | Loading |
 
 ### Store Structure
 
-The store is divided into three concerns:
+The store is divided into four concerns:
 
 1. **Model State**: The causal graph structure from the LLM
 2. **Intervention State**: User-set node values (do-operator)
 3. **Computed State**: Monte Carlo samples and KDE distributions
+4. **UI State**: Selected node, hovered node, panel visibility
 
 When interventions change, the store triggers recomputation, which updates all downstream distributions.
 
@@ -142,49 +113,24 @@ The inference engine implements Pearl's do-calculus through Monte Carlo sampling
 
 ![Inference Engine](./images/inference-engine.png)
 
-<!--
-```mermaid
-flowchart TD
-    subgraph Input
-        M[Causal Model]
-        I[Interventions Map]
-    end
+### Processing Pipeline
 
-    subgraph Processing
-        TS[Topological Sort]
-        LOOP[For each node in order]
+**Input**
+- Causal Model (nodes, edges, distributions)
+- Interventions Map (nodeId → fixed value)
 
-        subgraph NodeProcessing["Node Processing"]
-            CHECK{Node type?}
-            INT[Fixed intervention value]
-            EXO[Sample from prior]
-            ENDO[Compute from parents]
-        end
+**Processing**
+1. Topological Sort - Order nodes so parents are processed before children
+2. For each node in order:
+   - If **Intervened**: Set all samples to the fixed intervention value
+   - If **Exogenous**: Sample from prior distribution
+   - If **Endogenous**: Compute from parent samples using effect functions
+3. Apply Circuit Breakers - Enforce boundaries, prevent explosions
+4. Clamp Variance - Prevent distributions from becoming too flat
 
-        CB[Apply Circuit Breakers]
-        VAR[Clamp Variance]
-    end
-
-    subgraph Output
-        SAMP[Node Samples]
-        KDE[KDE Distributions]
-    end
-
-    M --> TS
-    I --> TS
-    TS --> LOOP
-    LOOP --> CHECK
-    CHECK -->|Intervened| INT
-    CHECK -->|Exogenous| EXO
-    CHECK -->|Endogenous| ENDO
-    INT --> CB
-    EXO --> CB
-    ENDO --> CB
-    CB --> VAR
-    VAR --> SAMP
-    SAMP --> KDE
-```
--->
+**Output**
+- Node Samples - Array of 100 sample values per node
+- KDE Distributions - Kernel density estimates for visualization
 
 ### Propagation Algorithm
 
@@ -200,29 +146,12 @@ Effects are applied sample-by-sample, preserving correlations across the graph.
 
 Four effect types transform how parent values influence children:
 
-| Effect Type | Formula | Output |
-|-------------|---------|--------|
-| Linear | y = base + coef × parent | Shifted distribution |
-| Multiplicative | y = base × factor^parent | Scaled distribution |
-| Threshold | sigmoid transition | Regime-dependent |
-| Logistic | log-odds shift | Probability change |
-
-<!--
-```mermaid
-graph LR
-    subgraph Effects["Effect Types"]
-        LIN[Linear]
-        MULT[Multiplicative]
-        THRESH[Threshold]
-        LOG[Logistic]
-    end
-
-    LIN -->|"y = base + coef × parent"| OUT1[Shifted distribution]
-    MULT -->|"y = base × factor^parent"| OUT2[Scaled distribution]
-    THRESH -->|"sigmoid transition"| OUT3[Regime-dependent]
-    LOG -->|"log-odds shift"| OUT4[Probability change]
-```
--->
+| Effect Type | Formula | Output | Use Case |
+|-------------|---------|--------|----------|
+| Linear | y = base + coef × parent | Shifted distribution | Direct proportional effects |
+| Multiplicative | y = base × factor^parent | Scaled distribution | Compound growth effects |
+| Threshold | sigmoid transition at cutoff | Regime-dependent | Tipping points, phase changes |
+| Logistic | log-odds shift | Probability change | Binary outcomes |
 
 ### Circuit Breakers
 
@@ -236,43 +165,18 @@ Safety mechanisms prevent distributions from exploding through cascading effects
 
 ## Graph Visualization
 
-D3.js renders the causal graph with dagre providing the layout algorithm. The visualization pipeline:
+D3.js renders the causal graph with dagre providing the layout algorithm.
 
-**Layout** → Dagre Layout Engine → **Rendering** (SVG Container, Arrow Markers, Zone Legend, Edge Paths, Node Groups) → **Shapes** (Rounded Rect, Hard Rect, Parallelogram, Octagon)
+### Visualization Pipeline
 
-<!--
-```mermaid
-flowchart LR
-    subgraph Layout
-        DAGRE[Dagre Layout Engine]
-    end
-
-    subgraph Rendering
-        SVG[SVG Container]
-        DEFS[Arrow Markers]
-        ZONES[Zone Legend]
-        EDGES[Edge Paths]
-        NODES[Node Groups]
-    end
-
-    subgraph Shapes
-        RECT[Rounded Rect]
-        HARD[Hard Rect]
-        PARA[Parallelogram]
-        OCT[Octagon]
-    end
-
-    DAGRE --> SVG
-    SVG --> DEFS
-    SVG --> ZONES
-    SVG --> EDGES
-    SVG --> NODES
-    NODES --> RECT
-    NODES --> HARD
-    NODES --> PARA
-    NODES --> OCT
-```
--->
+| Stage | Component | Purpose |
+|-------|-----------|---------|
+| Layout | Dagre Layout Engine | Computes optimal node positions for DAG |
+| Container | SVG Container | Root element for all graphics |
+| Definitions | Arrow Markers | Reusable arrowhead definitions |
+| Legend | Zone Legend | Color-coded category indicators |
+| Connections | Edge Paths | Lines connecting nodes with arrows |
+| Nodes | Node Groups | Grouped shapes, labels, and indicators |
 
 ### Node Shape Mapping
 
@@ -285,102 +189,52 @@ Shapes communicate node semantics at a glance:
 | Parallelogram | `polygon` | Exogenous | External input |
 | Wide octagon | `polygon` | Gatekeeper | Filter/gate |
 
+### Visual Indicators
+
+- **Zone colors**: Background color indicates category (e.g., Economic, Social, Environmental)
+- **Selection**: Thick border + glow effect on selected node
+- **Intervention**: Yellow background + orange border + glow on intervened nodes
+- **Mean display**: Each node shows μ=value with units
+
 ## LLM Integration
 
 The LLM generates causal models from natural language through structured prompting. A validation layer ensures model correctness.
 
-**Generation**: User Query → System Prompt + Query → Gemini API → Raw JSON Response
+### Generation Pipeline
 
-**Validation**: JSON Parse → Structure Validation → Connectivity Check → Node Type Fixing → Valid CausalModel
+| Step | Component | Input | Output |
+|------|-----------|-------|--------|
+| 1 | User Query | Natural language question | Raw text |
+| 2 | System Prompt | Query + schema instructions | Formatted prompt |
+| 3 | Gemini API | Prompt | Raw JSON response |
+| 4 | JSON Parse | Raw response | Parsed object |
 
-<!--
-```mermaid
-flowchart TD
-    subgraph Generation
-        QUERY[User Query]
-        PROMPT[System Prompt + Query]
-        GEMINI[Gemini API]
-        JSON[Raw JSON Response]
-    end
+### Validation Pipeline
 
-    subgraph Validation
-        PARSE[JSON Parse]
-        STRUCT[Structure Validation]
-        CONNECT[Connectivity Check]
-        TYPES[Node Type Fixing]
-    end
+| Step | Check | Action on Failure |
+|------|-------|-------------------|
+| 1 | Structure Validation | Verify nodes, edges, zones arrays exist | Throw error |
+| 2 | Connectivity Check | Find disconnected components | Add edges to connect |
+| 3 | Node Type Fixing | Validate type matches structure | Auto-fix types |
 
-    subgraph Output
-        MODEL[Valid CausalModel]
-    end
+### Node Type Fixing Rules
 
-    QUERY --> PROMPT
-    PROMPT --> GEMINI
-    GEMINI --> JSON
-    JSON --> PARSE
-    PARSE --> STRUCT
-    STRUCT --> CONNECT
-    CONNECT -->|Add edges if needed| TYPES
-    TYPES -->|Fix based on structure| MODEL
-```
--->
-
-### Validation Steps
-
-1. **Structure Validation**: Verify nodes, edges, and zones arrays exist
-2. **Connectivity Check**: Find disconnected components, add edges to connect them
-3. **Node Type Fixing**:
-   - Nodes with no incoming edges → exogenous
-   - Nodes with no outgoing edges → terminal
-   - Nodes marked terminal but with children → endogenous
+- Nodes with no incoming edges → `exogenous`
+- Nodes with no outgoing edges → `terminal`
+- Nodes marked terminal but with children → `endogenous`
 
 ## Technology Stack
 
-| Category | Technology |
-|----------|------------|
-| Framework | Next.js 14, React 18 |
-| State | Zustand |
-| Visualization | D3.js, Dagre Layout |
-| Statistics | jStat |
-| Styling | Tailwind CSS |
-| LLM | Google Gemini |
-
-<!--
-```mermaid
-graph TB
-    subgraph Framework
-        NEXT[Next.js 14]
-        REACT[React 18]
-    end
-
-    subgraph State
-        ZUSTAND[Zustand]
-    end
-
-    subgraph Visualization
-        D3[D3.js]
-        DAGRE[Dagre Layout]
-    end
-
-    subgraph Statistics
-        JSTAT[jStat]
-    end
-
-    subgraph Styling
-        TAILWIND[Tailwind CSS]
-    end
-
-    subgraph LLM
-        GEMINI[Google Gemini]
-    end
-
-    NEXT --> REACT
-    REACT --> ZUSTAND
-    REACT --> D3
-    D3 --> DAGRE
-    ZUSTAND --> JSTAT
-```
--->
+| Category | Technology | Purpose |
+|----------|------------|---------|
+| Framework | Next.js 14 | React framework with App Router |
+| UI Library | React 18 | Component-based UI |
+| State | Zustand | Lightweight state management |
+| Visualization | D3.js | SVG-based graph rendering |
+| Layout | Dagre | DAG layout algorithm |
+| Statistics | jStat | Probability distributions |
+| Styling | Tailwind CSS | Utility-first CSS |
+| LLM | Google Gemini | Causal model generation |
 
 ## File Structure
 
