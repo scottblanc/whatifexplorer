@@ -25,7 +25,7 @@ An interactive web tool that transforms natural language questions into explorab
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/whatifexplorer.git
+git clone https://github.com/scottblanc/whatifexplorer.git
 cd whatifexplorer
 
 # Install dependencies
@@ -88,6 +88,17 @@ src/
 - [Causal Modeling](docs/CausalModeling.md) — SCMs, the do-operator, distributions, and Monte Carlo inference
 - [Requirements](docs/PRD.md) — Goals, philosophy, and functional requirements
 
+## Contributing
+
+Contributions are welcome. Please open an issue to discuss proposed changes before submitting a pull request. For bug fixes and minor improvements, feel free to submit a PR directly.
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/your-feature`)
+3. Commit your changes
+4. Push to your branch and open a pull request
+
 ## License
 
-MIT
+MIT License. See [LICENSE](LICENSE) for details.
+
+Copyright (c) 2025 Scott White

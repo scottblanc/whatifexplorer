@@ -4,6 +4,7 @@
 | | |
 |---|---|
 | **Project** | What If Explorer |
+| **Author** | Scott White, Claude Code |
 | **Version** | 0.1 |
 | **Status** | Development |
 
