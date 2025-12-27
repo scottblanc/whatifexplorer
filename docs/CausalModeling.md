@@ -250,7 +250,7 @@ The LLM (Gemini) generates causal models from natural language queries. This is 
 
 ### Prompt Structure
 
-The system prompt (~2000 tokens) provides:
+The system prompt provides:
 
 1. **Conceptual grounding**: What an SCM is, what nodes/edges/distributions mean
 2. **Schema specification**: TypeScript-style type definitions for the output format

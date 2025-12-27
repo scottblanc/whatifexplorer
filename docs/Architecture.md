@@ -46,90 +46,35 @@ The codebase separates concerns into three layers: React components handle user 
 
 ### Components
 
-**CausalGraph** is the most complex component—it manages a D3.js visualization inside a React lifecycle. On mount, it dynamically imports dagre (the layout library), then uses D3 to render SVG elements for nodes, edges, and the zone legend. Click handlers call back to the store's `selectNode()`.
+The UI is built from five React components. CausalGraph handles the visualization—it dynamically loads dagre for layout computation, then uses D3 to render the SVG with nodes, edges, and a zone legend. When users click nodes, the component notifies the store, which updates the selection state and triggers the NodeInspector to appear.
 
-**NodeInspector** appears when a node is selected. It shows the node's description, probability distribution as a density curve, and an intervention slider. The slider range is derived from the node's distribution bounds. Clicking "Set Value" calls `setIntervention()`.
+NodeInspector is where users interact with individual variables. It displays the node's description and shows its probability distribution as a density curve. The intervention slider lets users set a value, and clicking "Set Value" triggers the inference engine to propagate effects through the graph.
 
-**QueryInput** is intentionally simple—a text field and a button. On submit, it calls the `/api/generate` endpoint, shows a loading spinner, and on success calls `setModel()`. It knows nothing about causal inference or graph rendering.
+QueryInput handles model generation—users type a causal question, click Generate, and wait for the LLM to return a model. The component manages loading state and error handling, then hands the resulting model to the store.
 
-**DistributionChart** renders small KDE curves using D3. It takes a `RenderableDistribution` (array of {x, y} points) and draws an area chart with percentile markers.
-
-**InsightsPanel** displays LLM-generated insights about the causal structure—key relationships, bottlenecks, and non-obvious pathways.
+DistributionChart and InsightsPanel round out the UI. The chart renders small KDE curves with percentile markers. The insights panel shows LLM-generated observations about the causal structure.
 
 ### State Management
 
-Zustand was chosen over Redux or React Context for simplicity. The entire store is one file with no boilerplate—actions are just functions that call `set()`. Components subscribe to specific slices using selector functions, so they only re-render when their slice changes.
+All application state lives in a single Zustand store. The store holds the causal model from the LLM, a map of active interventions, the computed distributions from Monte Carlo sampling, and UI state like which node is selected.
 
-The store manages four categories:
-
-**Model state**: The causal graph from the LLM (nodes, edges, zones). Set once when the model loads, unchanged until a new query.
-
-**Intervention state**: A Map from node ID to intervention value. The inference engine checks this for each node—if present, it uses the fixed value instead of sampling.
-
-**Computed state**: Monte Carlo samples and KDE distributions for each node. Recomputed whenever model or interventions change.
-
-**UI state**: Selected node, hovered node, panel visibility. Purely presentational.
-
-The store exposes granular selector hooks (`useModel()`, `useInterventions()`, `useNodeDistribution(id)`) so components subscribe to exactly what they need.
+When interventions change, the store automatically triggers recomputation. The inference engine receives the current model and intervention map, runs Monte Carlo propagation, and returns updated distributions. Components subscribe to specific pieces of state through selector hooks—a component displaying one node's distribution only re-renders when that distribution changes, not when unrelated state updates.
 
 ### Graph Rendering
 
-D3.js renders the graph because React's reconciliation doesn't handle complex SVG manipulation well. When you need pixel-perfect arrow positioning and custom shapes, D3's imperative approach is cleaner.
+The graph renders as SVG using D3 for element manipulation and dagre for layout. Dagre computes node positions that minimize edge crossings while maintaining a top-to-bottom causal flow—causes appear above their effects.
 
-**Layout**: Dagre computes optimal node positions for the DAG, minimizing edge crossings and maintaining hierarchical flow (causes above effects). We configure top-to-bottom flow with tuned spacing.
-
-**Rendering**: The SVG is cleared and rebuilt on each render. This sounds expensive but is faster than diffing for our use case. Layers are rendered in order: arrow definitions, zone legend, edges, nodes.
-
-**Shapes**: Node shapes encode type—rounded rectangles for standard nodes, hard rectangles for terminals, parallelograms for exogenous inputs, octagons for gatekeepers.
-
-**Visual feedback**: Selected nodes get thick borders and shadows. Intervened nodes turn yellow with orange borders and glow effects. Each node displays its current mean and units.
+The rendering rebuilds the entire SVG on each update, layering elements in order: arrow marker definitions, the zone legend bar, edge paths with arrowheads, and finally node groups containing shapes and labels. Node shapes communicate type at a glance—parallelograms for exogenous inputs, rounded rectangles for intermediate variables, hard rectangles for terminal outcomes. Selected and intervened nodes get visual emphasis through borders, shadows, and color changes.
 
 ## Technology Stack
 
-**Next.js 14** with the App Router provides the framework. We use it lightly—one page and one API route (to proxy Gemini calls and keep the API key server-side).
+**Next.js 14**: React framework with one page and one API route for proxying LLM calls.
 
-**Zustand** for state management because it's 10× simpler than Redux. The entire store is one file.
+**Zustand**: Single-file state store with selector-based subscriptions.
 
-**D3.js + Dagre** for visualization. D3 does SVG rendering, Dagre does DAG layout. We considered vis.js and Cytoscape but needed more control over node shapes.
+**D3.js + Dagre**: SVG rendering with DAG layout computation.
 
-**jStat** for statistical functions—sampling from distributions and computing KDEs. Well-tested and covers all distribution types we need.
+**jStat**: Statistical sampling and kernel density estimation.
 
-**Tailwind CSS** for styling. Utility classes are faster to iterate with than CSS files.
+**Tailwind CSS**: Utility-class styling.
 
-## File Structure
-
-```
-src/
-├── app/
-│   ├── page.tsx              # Single page app - composes all components
-│   └── api/generate/route.ts # Proxies Gemini API calls
-├── components/
-│   ├── CausalGraph.tsx       # D3 visualization - most complex component
-│   ├── NodeInspector.tsx     # Side panel for selected node
-│   ├── QueryInput.tsx        # Text input + generate button
-│   ├── DistributionChart.tsx # Small KDE curve renderer
-│   └── InsightsPanel.tsx     # LLM-generated insights
-├── lib/
-│   ├── inference.ts          # Monte Carlo propagation (see CausalModeling.md)
-│   ├── distributions.ts      # jStat wrappers + KDE computation
-│   ├── llm.ts                # Prompt construction + response validation
-│   └── sampleModels.ts       # Hardcoded models for testing
-├── store/
-│   └── graphStore.ts         # All application state in one Zustand store
-└── types/
-    └── causal.ts             # TypeScript interfaces for the causal model
-```
-
-## Performance
-
-The performance budget targets interactive feel—interventions should update instantly.
-
-**Model generation**: 2-10 seconds depending on query complexity. Acceptable with loading feedback since it's a one-time cost.
-
-**Propagation**: Must complete in under 100ms. With 100 samples and ~20 nodes, we see 20-50ms. The algorithm is O(nodes × samples × avg_parents).
-
-**KDE computation**: 10-30ms additional. We compute 50 density points using Silverman's bandwidth rule.
-
-**Rendering**: Targets 16ms (60fps). D3's full re-render finishes in 5-10ms for typical graphs.
-
-The 100-sample count balances smoothness against speed. More samples would give marginally smoother distributions, but the visual difference above ~100 is negligible while computation scales linearly.
