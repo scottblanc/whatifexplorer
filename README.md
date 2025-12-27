@@ -82,6 +82,12 @@ src/
 └── types/            # TypeScript type definitions
 ```
 
+## Related
+
+- [Architecture](docs/Architecture.md) — System design, data flow, and UI components
+- [Causal Modeling](docs/CausalModeling.md) — SCMs, the do-operator, distributions, and Monte Carlo inference
+- [Requirements](docs/PRD.md) — Goals, philosophy, and functional requirements
+
 ## License
 
 MIT

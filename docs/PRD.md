@@ -4,44 +4,54 @@
 | | |
 |---|---|
 | **Project** | What If Explorer |
-| **Version** | 1.0 (MVP) |
+| **Version** | 0.1 |
 | **Status** | Development |
 
 ---
 
 ## 1. Executive Summary
 
-What If Explorer transforms natural language questions about cause-and-effect into interactive causal models that users can manipulate. The core hypothesis: people understand causal systems by intervening in them, not by looking at static diagrams.
+What If Explorer transforms natural language questions about cause-and-effect into interactive causal models that users can manipulate. The core hypothesis: people understand how systems work by seeing visual diagrams of causal relationships and by intervening in them to observe effects.
 
-A user asks "How does the Fed's interest rate policy affect unemployment?" The system generates a causal graph showing the pathways—interest rates affect borrowing, borrowing affects investment, investment affects hiring. The user drags a slider to set interest rates to 7% and watches unemployment rise across the graph. That moment of seeing effects propagate is when abstract causal relationships become concrete.
+A user asks "How does the Fed's interest rate policy affect unemployment?" The system generates a causal graph showing the pathways: interest rates affect borrowing, borrowing affects investment, investment affects hiring. The user drags a slider to set interest rates to 7% and watches unemployment rise across the graph. That moment of seeing effects propagate is when abstract causal relationships become concrete.
 
-The system combines two capabilities: LLMs that can generate plausible causal structures from domain knowledge, and Monte Carlo simulation that can propagate interventions through those structures in real-time. Neither capability alone solves the problem—static LLM. Generated diagrams don't let you explore, and simulation engines require expert-built models.
+The system combines two capabilities: LLMs that can generate causal diagrams capturing how variables influence each other, and Monte Carlo simulation that can propagate interventions through those structures in real-time. Neither capability alone solves the problem. Static LLM-generated diagrams don't let you explore, and simulation engines require expert-built models.
 
 ---
 
 ## 2. Problem Statement
 
-### 2.1 Current State
+### 2.1 Complexity Obscures Causation
 
-Understanding causal relationships in complex systems—economics, healthcare, policy—requires either expertise or faith. Experts build formal models in specialized tools (Stata, R, Python causal libraries) that require statistical training to use. Everyone else relies on intuition, which breaks down past a few variables.
+Complex systems have dozens of interconnected variables where everything seems to affect everything else. Interest rates influence borrowing, which affects investment, which changes employment, which shifts consumer spending, which feeds back into inflation. The human mind can follow two or three links in a causal chain, but real systems have ten or twenty variables with overlapping pathways, opposing effects, and nonlinear relationships.
 
-The gap is widest for the people who most need causal reasoning: policy analysts evaluating interventions, business strategists modeling market dynamics, students learning how systems work. They think in terms of cause and effect but lack tools to formalize and test their mental models.
+Without tools, people either oversimplify (picking one causal story and ignoring alternatives) or throw up their hands (declaring the system too complex to reason about). Neither response leads to good decisions.
 
-### 2.2 The Intervention Problem
+### 2.2 Changes Are Hard to Trace
 
-Static diagrams—even good ones—can't answer "what if?" questions. A diagram shows that A causes B causes C. But what happens to C if you force A to a specific value? How much uncertainty is there? What if there are multiple pathways with opposing effects?
+Even when people understand the structure of a system, they struggle to predict how a change propagates. If you raise the minimum wage by 10%, what happens to employment? The direct effect is clear, but the indirect effects through prices, demand, automation incentives, and regional competition are not. Multiple pathways exist, some reinforcing and some opposing.
 
-These questions require simulation, and simulation requires a formal model. Building formal models requires expertise. This is the bottleneck we're breaking.
+Static diagrams show structure but not dynamics. Spreadsheets model dynamics but hide structure. Neither lets you see how a specific intervention ripples through interconnected variables while accounting for uncertainty.
 
 ### 2.3 Opportunity
 
-LLMs trained on domain knowledge can generate plausible causal structures—not because they understand causality, but because they've absorbed how experts describe causal relationships in economics, medicine, policy, and other fields. The structures won't be publication-quality, but they'll be good enough to explore.
+LLMs trained on domain knowledge can generate plausible causal structures. Not because they understand causality, but because they've absorbed how experts describe causal relationships in economics, medicine, policy, and other fields. The structures won't be publication-quality, but they'll be good enough to explore.
 
 Combining LLM-generated models with real-time Monte Carlo simulation lets anyone ask "what if?" and get an immediate, probabilistic answer. The interaction teaches causal intuition in a way that reading never can.
 
+### 2.4 Target Users
+
+**Policy analysts** evaluating how interventions ripple through economic or social systems. They need to explain causal chains to stakeholders who won't read regression tables.
+
+**Business strategists** modeling market dynamics, pricing effects, or operational changes. They think causally but lack tools to formalize intuitions.
+
+**Students and educators** learning how complex systems work. Interactive exploration builds intuition faster than static diagrams or equations.
+
+**Curious generalists** who want to understand cause-and-effect in domains they care about (climate, health, economics) without becoming domain experts first.
+
 ---
 
-## 3. Goals & Success Metrics
+## 3. Goals
 
 ### 3.1 Primary Goal
 
@@ -55,21 +65,11 @@ A successful session is one where the user either:
 - Identifies which variables have the most leverage in the system
 - Updates their mental model of how the system works
 
-### 3.3 Key Metrics
-
-| Metric | Target | Rationale |
-|--------|--------|-----------|
-| Time to first intervention | < 2 min | Users should be exploring quickly, not waiting |
-| Interventions per session | 3+ | Multiple interventions indicate genuine exploration |
-| Distribution plausibility | No explosions/collapses | Propagation must produce realistic uncertainty |
-| Return sessions | 20%+ within 7 days | Users found value and want more |
-
-### 3.4 Non-Goals
+### 3.3 Non-Goals
 
 - Replacing formal causal inference tools for researchers
 - Producing publication-quality causal estimates
 - Handling time-series or feedback loops (v1)
-- Multi-user collaboration
 
 ---
 
@@ -87,13 +87,13 @@ This means we optimize for:
 
 ### 4.2 The do-Operator as Core Interaction
 
-Pearl's do-operator is the conceptual foundation. When users set an intervention, they're asking "what would happen if this variable were forced to this value, regardless of its natural causes?" This is different from observation and correlation—it's the causal question.
+Pearl's do-operator is the conceptual foundation. When users set an intervention, they're asking "what would happen if this variable were forced to this value, regardless of its natural causes?" This is different from observation and correlation; it's the causal question.
 
 The slider-and-button interaction makes this concrete. Users don't need to understand the math; they experience the difference between observing and intervening through the interface.
 
 ### 4.3 Uncertainty as First-Class Citizen
 
-Effects don't propagate as point estimates. They propagate as distributions. A 1% increase in interest rates doesn't produce a single unemployment number—it produces a range of outcomes with associated probabilities.
+Effects don't propagate as point estimates. They propagate as distributions. A 1% increase in interest rates doesn't produce a single unemployment number. It produces a range of outcomes with associated probabilities.
 
 Showing uncertainty prevents false confidence and teaches users that causal systems have inherent variability. The width of a distribution is information.
 
@@ -112,7 +112,7 @@ Generation should complete in under 10 seconds with clear loading feedback. If t
 
 ### 5.2 Graph Visualization
 
-The graph renders with causes above effects (top-to-bottom flow). Node shapes encode type: parallelograms for external inputs, rounded rectangles for intermediate variables, hard rectangles for terminal outcomes.
+The graph renders with causes above effects (top-to-bottom flow). Node shapes encode type: parallelograms for external inputs, rounded rectangles for intermediate variables, hard rectangles for terminal outcomes, and octagons for gatekeepers that filter or transform information flow.
 
 Zone colors group related variables. Each node displays its current mean value. The layout minimizes edge crossings while keeping the graph compact.
 
@@ -150,7 +150,7 @@ These guide exploration for users who aren't sure where to start.
 
 ### 6.1 Client-Side Computation
 
-All inference runs in the browser. This eliminates server round-trips for interventions, enabling the instant feedback that makes exploration feel responsive. The tradeoff is computation limits—100 Monte Carlo samples across ~20 nodes is the practical ceiling before UI lag becomes noticeable.
+All inference runs in the browser. This eliminates server round-trips for interventions, enabling the instant feedback that makes exploration feel responsive. The tradeoff is computation limits: 100 Monte Carlo samples across ~20 nodes is the practical ceiling before UI lag becomes noticeable.
 
 ### 6.2 LLM Model Quality
 
@@ -164,7 +164,7 @@ Validation and repair run on every LLM response. Node types are corrected based 
 
 ### 6.3 Distribution Stability
 
-Without safeguards, cascading effects produce absurd distributions—infinite variance, values outside physical bounds, numerical overflow. Circuit breakers enforce:
+Without safeguards, cascading effects produce absurd distributions: infinite variance, values outside physical bounds, numerical overflow. Circuit breakers enforce:
 - Boundary clamping to physical limits
 - Variance compression when uncertainty explodes
 - Multiplier caps on exponential effects
@@ -207,7 +207,7 @@ Current models are static snapshots. Temporal models would show how systems evol
 
 ### 9.3 Model Editing
 
-Let users modify LLM-generated models—add nodes, remove edges, adjust effect strengths—to test alternative causal theories. This bridges the gap between fully automated generation and expert model building.
+Let users modify LLM-generated models (add nodes, remove edges, adjust effect strengths) to test alternative causal theories. This bridges the gap between fully automated generation and expert model building.
 
 ### 9.4 Collaborative Features
 
