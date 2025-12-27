@@ -4,6 +4,15 @@
 
 An interactive web tool that transforms natural language questions into explorable causal graphs. Describe a cause-and-effect relationship you want to understand, and the system generates a Structural Causal Model (SCM) you can manipulate through interventions.
 
+## How It Works
+
+1. **Query Processing**: User's natural language question is sent to Gemini with a structured prompt
+2. **Model Generation**: Gemini returns a JSON Structural Causal Model with nodes, edges, and distributions
+3. **Validation**: The model is validated for connectivity and correct node typing
+4. **Rendering**: D3.js renders the DAG using dagre for layout
+5. **Inference**: When interventions are made, Monte Carlo sampling propagates effects through the graph
+6. **Visualization**: Node distributions update in real-time based on propagated samples
+
 ## Features
 
 - **Natural Language Input**: Ask questions like "How does inflation affect unemployment?" or "What drives housing prices?"
@@ -88,15 +97,6 @@ src/
 ├── store/            # Zustand state management
 └── types/            # TypeScript type definitions
 ```
-
-## How It Works
-
-1. **Query Processing**: User's natural language question is sent to Gemini with a structured prompt
-2. **Model Generation**: Gemini returns a JSON Structural Causal Model with nodes, edges, and distributions
-3. **Validation**: The model is validated for connectivity and correct node typing
-4. **Rendering**: D3.js renders the DAG using dagre for layout
-5. **Inference**: When interventions are made, Monte Carlo sampling propagates effects through the graph
-6. **Visualization**: Node distributions update in real-time based on propagated samples
 
 ## License
 

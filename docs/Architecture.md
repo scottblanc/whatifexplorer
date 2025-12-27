@@ -65,16 +65,3 @@ When interventions change, the store automatically triggers recomputation. The i
 The graph renders as SVG using D3 for element manipulation and dagre for layout. Dagre computes node positions that minimize edge crossings while maintaining a top-to-bottom causal flow—causes appear above their effects.
 
 The rendering rebuilds the entire SVG on each update, layering elements in order: arrow marker definitions, the zone legend bar, edge paths with arrowheads, and finally node groups containing shapes and labels. Node shapes communicate type at a glance—parallelograms for exogenous inputs, rounded rectangles for intermediate variables, hard rectangles for terminal outcomes. Selected and intervened nodes get visual emphasis through borders, shadows, and color changes.
-
-## Technology Stack
-
-**Next.js 14**: React framework with one page and one API route for proxying LLM calls.
-
-**Zustand**: Single-file state store with selector-based subscriptions.
-
-**D3.js + Dagre**: SVG rendering with DAG layout computation.
-
-**jStat**: Statistical sampling and kernel density estimation.
-
-**Tailwind CSS**: Utility-class styling.
-
