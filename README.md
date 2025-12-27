@@ -6,20 +6,13 @@ An interactive web tool that transforms natural language questions into explorab
 
 ## How It Works
 
-1. **Query Processing**: User's natural language question is sent to Gemini with a structured prompt
-2. **Model Generation**: Gemini returns a JSON Structural Causal Model with nodes, edges, and distributions
+1. **Natural Language Query**: Ask questions like "How does inflation affect unemployment?" or "What drives housing prices?"
+2. **Model Generation**: An LLM returns a Structural Causal Model with nodes, edges, and probability distributions
 3. **Validation**: The model is validated for connectivity and correct node typing
 4. **Rendering**: D3.js renders the DAG using dagre for layout
-5. **Inference**: When interventions are made, Monte Carlo sampling propagates effects through the graph
-6. **Visualization**: Node distributions update in real-time based on propagated samples
-
-## Features
-
-- **Natural Language Input**: Ask questions like "How does inflation affect unemployment?" or "What drives housing prices?"
-- **AI-Generated Causal Models**: Uses Gemini to generate realistic causal graphs with appropriate probability distributions
-- **Interactive Interventions**: Click nodes to apply the do-operator and see how changes propagate through the system
-- **Monte Carlo Simulation**: Real-time propagation of effects using sampling-based inference
-- **Visual Node Types**: Different shapes indicate node roles (exogenous inputs, endogenous variables, terminal outcomes, gatekeepers)
+5. **Intervention**: Click nodes to apply Pearl's do-operator and set values
+6. **Inference**: Monte Carlo sampling propagates effects through the graph in real-time
+7. **Visualization**: Node distributions update based on propagated samples; shapes indicate roles (parallelograms for exogenous, rounded rectangles for endogenous, hard rectangles for terminal, octagons for gatekeepers)
 
 ## Getting Started
 
@@ -62,21 +55,12 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 4. Use the slider to set an intervention value
 5. Click "Set Value" to apply the intervention and see effects propagate
 
-### Node Shapes
-
-| Shape | Meaning |
-|-------|---------|
-| Rounded rectangle | Standard endogenous variable |
-| Hard-corner rectangle | Terminal outcome (no children) |
-| Parallelogram | Exogenous input (no parents) |
-| Octagon | Gatekeeper node (filters/transforms) |
-
 ## Tech Stack
 
 - **Framework**: Next.js 14 (App Router)
 - **State Management**: Zustand
 - **Visualization**: D3.js with dagre layout
-- **LLM**: Google Gemini Flash
+- **LLM**: Google Gemini
 - **Styling**: Tailwind CSS
 - **Language**: TypeScript
 
@@ -93,7 +77,7 @@ src/
 ├── lib/              # Core logic
 │   ├── inference.ts       # Monte Carlo propagation
 │   ├── distributions.ts   # Probability distributions
-│   └── llm.ts            # Gemini API integration
+│   └── llm.ts            # LLM API integration
 ├── store/            # Zustand state management
 └── types/            # TypeScript type definitions
 ```
