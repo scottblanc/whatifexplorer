@@ -275,10 +275,37 @@ Example realistic values:
 - Debt-to-GDP: params=[120, 10], units="%"
 - Treasury Yields: params=[4.5, 0.5], units="%"
 
-## Effect Types (use small coefficients to avoid unrealistic propagation):
-- linear: { "type": "linear", "coefficient": 0.1, "saturation": 5 }
-- multiplicative: { "type": "multiplicative", "factor": 1.05, "baseline": 1 }
-- threshold: { "type": "threshold", "cutoff": X, "below": Y, "above": Z }
+## Effect Types - Choose Based on Relationship Nature:
+
+### Linear (most common - use for direct proportional relationships)
+When to use: Direct cause-effect where doubling the cause roughly doubles the effect
+Examples: Interest rates → borrowing costs, Education → income, Advertising → sales
+Format: { "type": "linear", "coefficient": 0.1, "saturation": 5 }
+- coefficient: How much target changes per unit of source (keep small: -0.5 to 0.5)
+- intercept: Optional baseline shift
+- saturation: Optional cap using tanh (prevents runaway values)
+
+### Multiplicative (use for percentage-based or compounding effects)
+When to use: Effects that scale proportionally, compound growth, percentage changes
+Examples: Investment returns, inflation multipliers, productivity scaling
+Format: { "type": "multiplicative", "factor": 1.05, "baseline": 1 }
+- factor: Multiplier applied exponentially (keep close to 1: 0.9 to 1.2)
+- baseline: Reference point for normalization
+
+### Threshold (use for step changes or regime switches)
+When to use: Behavior changes above/below a critical value, policy triggers
+Examples: Recession thresholds, regulatory limits, capacity constraints
+Format: { "type": "threshold", "cutoff": 5.0, "below": 0.2, "above": 0.8, "smoothness": 2 }
+- cutoff: The critical value where behavior changes
+- below/above: Effect values on each side of cutoff
+- smoothness: How gradual the transition is (higher = sharper)
+
+### Logistic (use for probability/binary outcome effects)
+When to use: Affects likelihood of binary outcomes, risk factors
+Examples: Default probability, election outcomes, disease transmission
+Format: { "type": "logistic", "coefficient": 0.5, "threshold": 0 }
+- coefficient: How strongly source shifts the log-odds
+- threshold: Reference point for the effect
 
 ## Node Shapes (actual geometric shapes):
 - circle: Standard endogenous variables (rounded rectangle)

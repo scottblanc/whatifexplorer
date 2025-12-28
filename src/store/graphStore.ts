@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import type { CausalModel, RenderableDistribution } from '@/types/causal';
+import type { CausalModel, RenderableDistribution, EffectFunction } from '@/types/causal';
 import { propagateWithSampling, type NodeSamples } from '@/lib/inference';
 
 interface CausalGraphStore {
@@ -23,6 +23,7 @@ interface CausalGraphStore {
 
   // UI state
   selectedNodeId: string | null;
+  selectedEdgeId: string | null; // Format: "sourceId->targetId"
   hoveredNodeId: string | null;
   showInsights: boolean;
 
@@ -37,8 +38,10 @@ interface CausalGraphStore {
   clearAllInterventions: () => void;
 
   selectNode: (nodeId: string | null) => void;
+  selectEdge: (edgeId: string | null) => void;
   hoverNode: (nodeId: string | null) => void;
   toggleInsights: () => void;
+  updateEdgeEffect: (sourceId: string, targetId: string, effect: EffectFunction) => void;
 
   // Internal
   recompute: () => void;
@@ -55,6 +58,7 @@ export const useCausalGraphStore = create<CausalGraphStore>()(
     nodeSamples: {},
     nodeDistributions: new Map(),
     selectedNodeId: null,
+    selectedEdgeId: null,
     hoveredNodeId: null,
     showInsights: true,
 
@@ -101,10 +105,30 @@ export const useCausalGraphStore = create<CausalGraphStore>()(
     // UI actions
     selectNode: (nodeId) => {
       console.log('>>> [Store] selectNode called with:', nodeId);
-      set({ selectedNodeId: nodeId });
+      set({ selectedNodeId: nodeId, selectedEdgeId: null }); // Clear edge selection when node selected
+    },
+    selectEdge: (edgeId) => {
+      console.log('>>> [Store] selectEdge called with:', edgeId);
+      set({ selectedEdgeId: edgeId, selectedNodeId: null }); // Clear node selection when edge selected
     },
     hoverNode: (nodeId) => set({ hoveredNodeId: nodeId }),
     toggleInsights: () => set((state) => ({ showInsights: !state.showInsights })),
+
+    // Edge effect update
+    updateEdgeEffect: (sourceId, targetId, effect) => {
+      const { model } = get();
+      if (!model) return;
+
+      console.log('[Store] Updating edge effect:', sourceId, '->', targetId, effect);
+      const updatedEdges = model.edges.map((edge) =>
+        edge.source === sourceId && edge.target === targetId
+          ? { ...edge, effect }
+          : edge
+      );
+
+      set({ model: { ...model, edges: updatedEdges } });
+      get().recompute();
+    },
 
     // Recompute distributions
     recompute: () => {
@@ -134,6 +158,7 @@ export const useIsLoading = () => useCausalGraphStore((s) => s.isLoading);
 export const useError = () => useCausalGraphStore((s) => s.error);
 export const useInterventions = () => useCausalGraphStore((s) => s.interventions);
 export const useSelectedNodeId = () => useCausalGraphStore((s) => s.selectedNodeId);
+export const useSelectedEdgeId = () => useCausalGraphStore((s) => s.selectedEdgeId);
 export const useHoveredNodeId = () => useCausalGraphStore((s) => s.hoveredNodeId);
 export const useShowInsights = () => useCausalGraphStore((s) => s.showInsights);
 

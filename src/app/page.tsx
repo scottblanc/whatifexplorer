@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import CausalGraph from '@/components/CausalGraph';
 import NodeInspector from '@/components/NodeInspector';
+import EdgeInspector from '@/components/EdgeInspector';
 import QueryInput from '@/components/QueryInput';
 import InsightsPanel from '@/components/InsightsPanel';
 import { useCausalGraphStore } from '@/store/graphStore';
@@ -13,6 +14,7 @@ export default function Home() {
   const error = useCausalGraphStore((s) => s.error);
   const interventions = useCausalGraphStore((s) => s.interventions);
   const clearAllInterventions = useCausalGraphStore((s) => s.clearAllInterventions);
+  const selectedEdgeId = useCausalGraphStore((s) => s.selectedEdgeId);
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -81,7 +83,7 @@ export default function Home() {
                 {/* Legend */}
                 <div className="absolute bottom-6 right-6 bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs shadow-sm">
                   <div className="font-medium text-gray-700 mb-1.5">Node Shapes</div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 mb-3">
                     <div className="flex items-center gap-2">
                       <svg width="32" height="16" viewBox="0 0 32 16">
                         <rect x="1" y="1" width="30" height="14" rx="4" fill="white" stroke="#2563eb" strokeWidth="2"/>
@@ -107,6 +109,37 @@ export default function Home() {
                       <span className="text-gray-600">Gatekeeper</span>
                     </div>
                   </div>
+                  <div className="font-medium text-gray-700 mb-1.5 pt-2 border-t border-gray-200">Effect Types</div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <svg width="24" height="8" viewBox="0 0 24 8">
+                        <line x1="0" y1="4" x2="20" y2="4" stroke="#374151" strokeWidth="2"/>
+                        <polygon points="20,1 24,4 20,7" fill="#374151"/>
+                      </svg>
+                      <span className="text-gray-600">Linear</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <svg width="24" height="8" viewBox="0 0 24 8">
+                        <line x1="0" y1="4" x2="20" y2="4" stroke="#2563eb" strokeWidth="2"/>
+                        <polygon points="20,1 24,4 20,7" fill="#2563eb"/>
+                      </svg>
+                      <span className="text-gray-600">Multiplicative</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <svg width="24" height="8" viewBox="0 0 24 8">
+                        <line x1="0" y1="4" x2="20" y2="4" stroke="#d97706" strokeWidth="2"/>
+                        <polygon points="20,1 24,4 20,7" fill="#d97706"/>
+                      </svg>
+                      <span className="text-gray-600">Threshold</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <svg width="24" height="8" viewBox="0 0 24 8">
+                        <line x1="0" y1="4" x2="20" y2="4" stroke="#7c3aed" strokeWidth="2"/>
+                        <polygon points="20,1 24,4 20,7" fill="#7c3aed"/>
+                      </svg>
+                      <span className="text-gray-600">Logistic</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -119,10 +152,12 @@ export default function Home() {
           <div className="w-72 flex-shrink-0">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 sticky top-6 overflow-hidden">
               <div className="px-3 py-2 border-b border-gray-200">
-                <h2 className="font-medium text-gray-900 text-sm">Node Inspector</h2>
+                <h2 className="font-medium text-gray-900 text-sm">
+                  {selectedEdgeId ? 'Edge Inspector' : 'Node Inspector'}
+                </h2>
               </div>
               <div className="max-h-[calc(100vh-200px)] overflow-y-auto overflow-x-hidden">
-                <NodeInspector />
+                {selectedEdgeId ? <EdgeInspector /> : <NodeInspector />}
               </div>
             </div>
           </div>
@@ -135,6 +170,7 @@ export default function Home() {
           <p>
             What If Explorer uses Monte Carlo sampling with 100 particles for propagation.
             Click nodes to intervene (do-operator) and see downstream effects.
+            Click edges to view and edit effect types.
           </p>
         </div>
       </footer>

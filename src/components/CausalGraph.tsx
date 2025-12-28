@@ -2,11 +2,22 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import * as d3 from 'd3';
-import type { CausalModel, CausalNode, CausalEdge } from '@/types/causal';
+import type { CausalModel, CausalNode, CausalEdge, EffectFunction } from '@/types/causal';
 import { useCausalGraphStore } from '@/store/graphStore';
 
 // Dynamic import for dagre (CommonJS module)
 let dagreModule: typeof import('dagre') | null = null;
+
+// Color coding for effect types
+const getEdgeColor = (effect: EffectFunction): string => {
+  switch (effect.type) {
+    case 'linear': return '#374151';       // gray-700 - neutral, most common
+    case 'multiplicative': return '#2563eb'; // blue-600 - scaling/growth
+    case 'threshold': return '#d97706';     // amber-600 - warning/switch
+    case 'logistic': return '#7c3aed';      // violet-600 - probability
+    default: return '#374151';
+  }
+};
 
 interface NodePosition {
   id: string;
@@ -27,7 +38,9 @@ export default function CausalGraph({ width = 800, height = 600 }: Props) {
   const interventions = useCausalGraphStore((s) => s.interventions);
   const nodeDistributions = useCausalGraphStore((s) => s.nodeDistributions);
   const selectedNodeId = useCausalGraphStore((s) => s.selectedNodeId);
+  const selectedEdgeId = useCausalGraphStore((s) => s.selectedEdgeId);
   const selectNode = useCausalGraphStore((s) => s.selectNode);
+  const selectEdge = useCausalGraphStore((s) => s.selectEdge);
   const hoverNode = useCausalGraphStore((s) => s.hoverNode);
 
   // Load dagre dynamically
@@ -196,19 +209,28 @@ export default function CausalGraph({ width = 800, height = 600 }: Props) {
 
     console.log('[CausalGraph] Rendering graph with', model.nodes.length, 'nodes and', model.edges.length, 'edges');
 
-    // Add arrow marker definition - small black arrows
+    // Add arrow marker definitions for each effect type color
     const defs = svg.append('defs');
-    defs.append('marker')
-      .attr('id', 'arrowhead')
-      .attr('viewBox', '-0 -3 6 6')
-      .attr('refX', 5)
-      .attr('refY', 0)
-      .attr('orient', 'auto')
-      .attr('markerWidth', 5)
-      .attr('markerHeight', 5)
-      .append('path')
-      .attr('d', 'M 0,-3 L 6,0 L 0,3')
-      .attr('fill', '#000000');
+    const effectColors = [
+      { id: 'arrowhead-linear', color: '#374151' },
+      { id: 'arrowhead-multiplicative', color: '#2563eb' },
+      { id: 'arrowhead-threshold', color: '#d97706' },
+      { id: 'arrowhead-logistic', color: '#7c3aed' },
+      { id: 'arrowhead-selected', color: '#0ea5e9' }, // cyan for selected
+    ];
+    effectColors.forEach(({ id, color }) => {
+      defs.append('marker')
+        .attr('id', id)
+        .attr('viewBox', '-0 -3 6 6')
+        .attr('refX', 5)
+        .attr('refY', 0)
+        .attr('orient', 'auto')
+        .attr('markerWidth', 5)
+        .attr('markerHeight', 5)
+        .append('path')
+        .attr('d', 'M 0,-3 L 6,0 L 0,3')
+        .attr('fill', color);
+    });
 
     // Zone legend (horizontal bar at top) - properly spaced
     const zones = Object.entries(model.zones);
@@ -307,19 +329,47 @@ export default function CausalGraph({ width = 800, height = 600 }: Props) {
       const endX = target.x - (dx / dist) * (targetOffset + 6);
       const endY = target.y - (dy / dist) * (targetOffset + 6);
 
-      const path = edgeGroup.append('path')
+      // Determine edge color and selection state
+      const edgeId = `${edge.source}->${edge.target}`;
+      const isEdgeSelected = edgeId === selectedEdgeId;
+      const edgeColor = isEdgeSelected ? '#0ea5e9' : getEdgeColor(edge.effect);
+      const arrowMarkerId = isEdgeSelected ? 'arrowhead-selected' : `arrowhead-${edge.effect.type}`;
+
+      // Create a group for the edge to handle click events better
+      const edgeG = edgeGroup.append('g')
+        .attr('cursor', 'pointer')
+        .on('click', (event) => {
+          event.stopPropagation();
+          console.log('>>> EDGE CLICK:', edge.source, '->', edge.target);
+          selectEdge(edgeId);
+        });
+
+      // Invisible wider path for easier clicking
+      edgeG.append('path')
         .attr('d', `M ${startX} ${startY} L ${endX} ${endY}`)
         .attr('fill', 'none')
-        .attr('stroke', '#000000')
-        .attr('stroke-width', edge.weight === 'heavy' ? 2.5 : edge.weight === 'light' ? 1 : 1.5)
-        .attr('marker-end', 'url(#arrowhead)');
+        .attr('stroke', 'transparent')
+        .attr('stroke-width', 12);
+
+      // Visible path with effect type color
+      const path = edgeG.append('path')
+        .attr('d', `M ${startX} ${startY} L ${endX} ${endY}`)
+        .attr('fill', 'none')
+        .attr('stroke', edgeColor)
+        .attr('stroke-width', isEdgeSelected ? 3 : (edge.weight === 'heavy' ? 2.5 : edge.weight === 'light' ? 1 : 1.5))
+        .attr('marker-end', `url(#${arrowMarkerId})`);
 
       if (edge.style === 'dashed') {
         path.attr('stroke-dasharray', '5,5');
       }
 
-      if (edge.weight === 'light') {
+      if (edge.weight === 'light' && !isEdgeSelected) {
         path.attr('opacity', 0.5);
+      }
+
+      // Selection glow effect
+      if (isEdgeSelected) {
+        path.attr('filter', 'drop-shadow(0 0 4px rgba(14, 165, 233, 0.5))');
       }
     });
 
@@ -480,7 +530,7 @@ export default function CausalGraph({ width = 800, height = 600 }: Props) {
       }
     });
 
-  }, [model, interventions, nodeDistributions, selectedNodeId, calculatePositions, selectNode, hoverNode, dagreLoaded]);
+  }, [model, interventions, nodeDistributions, selectedNodeId, selectedEdgeId, calculatePositions, selectNode, selectEdge, hoverNode, dagreLoaded]);
 
   if (!model) {
     return (
