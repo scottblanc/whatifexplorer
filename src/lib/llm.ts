@@ -278,19 +278,23 @@ Example realistic values:
 ## Effect Types - Choose Based on Relationship Nature:
 
 ### Linear (most common - use for direct proportional relationships)
-When to use: Direct cause-effect where doubling the cause roughly doubles the effect
-Examples: Interest rates → borrowing costs, Education → income, Advertising → sales
-Format: { "type": "linear", "coefficient": 0.1, "saturation": 5 }
-- coefficient: How much target changes per unit of source (keep small: -0.5 to 0.5)
-- intercept: Optional baseline shift
-- saturation: Optional cap using tanh (prevents runaway values)
+When to use: Direct cause-effect where changes in parent proportionally affect target
+Examples: Interest rates → borrowing costs, Education → income, Screen time → sleep quality
+Format: { "type": "linear", "coefficient": 0.3 }
+- coefficient: Sensitivity/coupling strength (0.0 to 1.0 typical range)
+  - 0.0 = no coupling (parent has no effect on target)
+  - 0.3 = moderate coupling (if parent deviates 10% from baseline, target moves 3%)
+  - 0.5 = strong coupling (target moves half as much as parent deviates)
+  - 1.0 = tight coupling (target moves proportionally with parent)
+  - Use NEGATIVE values for inverse relationships (e.g., -0.3 means parent increase causes target decrease)
+- saturation: Optional cap on deviation magnitude (e.g., 2.0 limits effect to ±200%)
 
 ### Multiplicative (use for percentage-based or compounding effects)
 When to use: Effects that scale proportionally, compound growth, percentage changes
 Examples: Investment returns, inflation multipliers, productivity scaling
-Format: { "type": "multiplicative", "factor": 1.05, "baseline": 1 }
+Format: { "type": "multiplicative", "factor": 1.05, "baseline": 50 }
 - factor: Multiplier applied exponentially (keep close to 1: 0.9 to 1.2)
-- baseline: Reference point for normalization
+- baseline: CRITICAL - Set this to the parent node's prior mean! The formula is factor^(parent/baseline), so baseline=1 with large parent values causes explosion. Example: if parent has mean=100, set baseline=100
 
 ### Threshold (use for step changes or regime switches)
 When to use: Behavior changes above/below a critical value, policy triggers

@@ -74,22 +74,47 @@ export function topologicalSort(model: CausalModel): CausalNode[] {
 }
 
 /**
- * Apply linear effect with optional saturation
+ * Apply linear effect using sensitivity-based formula
+ *
+ * The coefficient represents "coupling strength" or "sensitivity":
+ * - 0.0 = no coupling (parent has no effect)
+ * - 0.5 = moderate coupling (target moves 50% as much as parent deviates)
+ * - 1.0 = tight coupling (target moves proportionally with parent)
+ *
+ * Formula: target = baseValue * (1 + coefficient * parentDeviation)
+ * where parentDeviation = (parentValue - parentMean) / parentMean
  */
 function applyLinearEffect(
   baseValue: number,
   effect: { coefficient?: number; intercept?: number; saturation?: number },
-  parentValue: number
+  parentValue: number,
+  parentPriorMean: number
 ): number {
-  const coefficient = effect.coefficient ?? 0.1; // Default small coefficient
-  const delta = coefficient * parentValue + (effect.intercept ?? 0);
+  const coefficient = effect.coefficient ?? 0.3; // Default moderate sensitivity
 
-  if (effect.saturation && effect.saturation > 0) {
-    const saturatedDelta = effect.saturation * Math.tanh(delta / effect.saturation);
-    return baseValue + saturatedDelta;
+  // Handle edge case where parent mean is zero or very small
+  if (Math.abs(parentPriorMean) < 0.001) {
+    // Fall back to small additive effect
+    const delta = coefficient * parentValue * 0.01;
+    return baseValue + delta;
   }
 
-  return baseValue + delta;
+  // Calculate parent's deviation from its mean (as a fraction)
+  const parentDeviation = (parentValue - parentPriorMean) / parentPriorMean;
+
+  // Apply saturation to the deviation if specified (prevents extreme swings)
+  let effectiveDeviation = parentDeviation;
+  if (effect.saturation && effect.saturation > 0) {
+    effectiveDeviation = effect.saturation * Math.tanh(parentDeviation / effect.saturation);
+  }
+
+  // Apply sensitivity: target scales proportionally with parent's deviation
+  const multiplier = 1 + coefficient * effectiveDeviation;
+
+  // Clamp multiplier to reasonable range (0.1x to 10x)
+  const clampedMultiplier = Math.min(Math.max(multiplier, 0.1), 10);
+
+  return baseValue * clampedMultiplier;
 }
 
 /**
@@ -164,7 +189,8 @@ function applyLogisticEffect(
 function applyEffectToSample(
   baseValue: number,
   effect: EffectFunction,
-  parentValue: number
+  parentValue: number,
+  parentPriorMean: number
 ): number {
   // Guard against invalid inputs
   if (!effect || typeof effect.type !== 'string') {
@@ -178,7 +204,7 @@ function applyEffectToSample(
     let result: number;
     switch (effect.type) {
       case 'linear':
-        result = applyLinearEffect(baseValue, effect, parentValue);
+        result = applyLinearEffect(baseValue, effect, parentValue, parentPriorMean);
         break;
       case 'multiplicative':
         result = applyMultiplicativeEffect(baseValue, effect, parentValue);
@@ -261,7 +287,8 @@ function clampVariance(samples: number[], config: CircuitBreakers): number[] {
 function computeChildSamples(
   node: CausalNode,
   edges: CausalEdge[],
-  parentSamples: NodeSamples
+  parentSamples: NodeSamples,
+  nodeMap: Map<string, CausalNode>
 ): number[] {
   const parentEdges = edges.filter(e => e.target === node.id);
   const baseSamples = sampleFromDistribution(node.distribution, SAMPLE_COUNT);
@@ -272,7 +299,9 @@ function computeChildSamples(
 
     for (const edge of parentEdges) {
       const parentValue = parentSamples[edge.source]?.[i] ?? 0;
-      value = applyEffectToSample(value, edge.effect, parentValue);
+      const parentNode = nodeMap.get(edge.source);
+      const parentPriorMean = parentNode ? expectedValue(parentNode.distribution) : 0;
+      value = applyEffectToSample(value, edge.effect, parentValue, parentPriorMean);
     }
 
     return value;
@@ -288,6 +317,7 @@ export function propagateWithSampling(
 ): PropagationResult {
   const samples: NodeSamples = {};
   const sorted = topologicalSort(model);
+  const nodeMap = new Map(model.nodes.map(n => [n.id, n]));
 
   console.log('>>> [Inference] Propagating with interventions:', [...interventions.entries()]);
   console.log('>>> [Inference] Topological order:', sorted.map(n => n.id).join(' -> '));
@@ -308,7 +338,7 @@ export function propagateWithSampling(
     } else {
       // Endogenous: compute from parents
       const parentEdges = model.edges.filter(e => e.target === node.id);
-      samples[node.id] = computeChildSamples(node, model.edges, samples);
+      samples[node.id] = computeChildSamples(node, model.edges, samples, nodeMap);
       const mean = samples[node.id].reduce((a, b) => a + b, 0) / SAMPLE_COUNT;
       console.log(`>>> [Inference] ${node.id}: endogenous, computed mean=${mean.toFixed(2)} (prior=${priorMean.toFixed(2)}) from parents: [${parentEdges.map(e => e.source).join(', ')}]`);
     }
