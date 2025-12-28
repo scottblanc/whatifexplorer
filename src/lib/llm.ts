@@ -148,11 +148,10 @@ function ensureConnectedGraph(model: CausalModel): CausalModel {
       newEdges.push({
         source: largeNode.id,
         target: smallNode.id,
-        relationship: 'influences',
+        relationship: 'causes',
         style: 'dashed',
         weight: 'light',
-        effect: { type: 'linear', coefficient: 0.1 },
-        description: 'Auto-generated connection for graph connectivity'
+        effect: { type: 'linear', coefficient: 0.1 }
       });
 
       // Add the small component nodes to the large component for next iteration
@@ -161,6 +160,80 @@ function ensureConnectedGraph(model: CausalModel): CausalModel {
   }
 
   return { ...model, edges: newEdges };
+}
+
+/**
+ * Validation result for user queries
+ */
+export interface QueryValidation {
+  isValid: boolean;
+  feedback: string;
+  suggestedQuery?: string;
+}
+
+const VALIDATION_PROMPT = `You are an expert at evaluating whether questions are suitable for causal modeling.
+
+A GOOD query for causal modeling:
+- Asks about cause-and-effect relationships between variables
+- Involves multiple interconnected factors
+- Can be represented as a directed graph of influences
+- Examples: "How does inflation affect unemployment?", "What factors drive housing prices?", "How does education level impact income?"
+
+A BAD query for causal modeling:
+- Simple factual questions ("What is the capital of France?")
+- Opinion or preference questions ("What's the best programming language?")
+- Vague or too broad ("Tell me about economics")
+- Single-variable questions with no causal chain
+- Requests for predictions without causal structure ("Will the stock market go up?")
+- How-to or procedural questions ("How do I make a cake?")
+
+Evaluate the user's query and respond with JSON:
+{
+  "isValid": true/false,
+  "feedback": "Explanation of why it is or isn't suitable, and specific suggestions for improvement if needed",
+  "suggestedQuery": "An improved version of the query if the original isn't suitable (omit if already valid)"
+}
+
+Respond ONLY with valid JSON. No markdown code blocks.`;
+
+/**
+ * Validate if a query is suitable for causal model generation
+ */
+export async function validateQuery(
+  query: string,
+  apiKey: string
+): Promise<QueryValidation> {
+  console.log('[LLM] Validating query:', query);
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.0-flash',
+    systemInstruction: VALIDATION_PROMPT,
+  });
+
+  try {
+    const result = await model.generateContent(
+      `Evaluate this query for causal modeling suitability:\n\n"${query}"`
+    );
+
+    let jsonText = result.response.text().trim();
+
+    // Remove markdown code blocks if present
+    if (jsonText.startsWith('```')) {
+      jsonText = jsonText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+    }
+
+    const validation = JSON.parse(jsonText) as QueryValidation;
+    console.log('[LLM] Validation result:', validation);
+    return validation;
+  } catch (e) {
+    console.error('[LLM] Validation error:', e);
+    // Default to valid if validation fails, let the main generation handle it
+    return {
+      isValid: true,
+      feedback: 'Validation skipped due to error'
+    };
+  }
 }
 
 const SYSTEM_PROMPT = `You are a causal inference expert. Given a user's question about cause-and-effect relationships, generate a Structural Causal Model (SCM) in JSON format.

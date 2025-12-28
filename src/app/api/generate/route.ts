@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateCausalModel } from '@/lib/llm';
+import { generateCausalModel, validateQuery } from '@/lib/llm';
 
 export async function POST(request: NextRequest) {
   try {
-    const { query } = await request.json();
+    const { query, skipValidation } = await request.json();
 
     if (!query || typeof query !== 'string') {
       return NextResponse.json(
@@ -18,6 +18,21 @@ export async function POST(request: NextRequest) {
         { error: 'GEMINI_API_KEY not configured' },
         { status: 500 }
       );
+    }
+
+    // Validate query unless explicitly skipped
+    if (!skipValidation) {
+      const validation = await validateQuery(query, apiKey);
+
+      if (!validation.isValid) {
+        return NextResponse.json({
+          validation: {
+            isValid: false,
+            feedback: validation.feedback,
+            suggestedQuery: validation.suggestedQuery
+          }
+        });
+      }
     }
 
     const model = await generateCausalModel(query, apiKey);
