@@ -154,63 +154,72 @@ export default function NodeInspector() {
       )}
 
       {/* Intervention Control */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">Intervene (do-operator)</span>
-          {isIntervened && (
+      {node.type === 'terminal' ? (
+        <div className="bg-gray-50 rounded-lg p-3">
+          <div className="text-sm font-medium text-gray-500 mb-1">Output Node</div>
+          <p className="text-xs text-gray-400">
+            Terminal nodes are model outputs. Intervene on upstream variables to see how this value changes.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Intervene (do-operator)</span>
+            {isIntervened && (
+              <button
+                onClick={handleClearIntervention}
+                className="text-xs text-orange-600 hover:text-orange-700"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            <input
+              type="range"
+              min={minValue}
+              max={maxValue}
+              step={(maxValue - minValue) / 100}
+              value={localValue}
+              onChange={handleSliderChange}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500"
+            />
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={localValue.toFixed(2)}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value);
+                  if (!isNaN(value)) {
+                    setLocalValue(value);
+                  }
+                }}
+                className="flex-1 px-2 py-1 text-sm border rounded"
+              />
+              <span className="text-sm text-gray-500">{node.units || ''}</span>
+            </div>
+          </div>
+
+          {/* Show button when value differs from current intervention (or when not intervened) */}
+          {(!isIntervened || Math.abs(localValue - (intervention ?? 0)) > 0.001) && (
             <button
-              onClick={handleClearIntervention}
-              className="text-xs text-orange-600 hover:text-orange-700"
+              onClick={handleApplyIntervention}
+              disabled={isComputing}
+              className="w-full py-2 text-sm bg-orange-500 text-white rounded hover:bg-orange-600 disabled:bg-orange-300 transition flex items-center justify-center gap-2"
             >
-              Clear
+              {isComputing ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Computing...
+                </>
+              ) : (
+                isIntervened ? 'Update Value' : 'Set Value'
+              )}
             </button>
           )}
         </div>
-
-        <div className="space-y-1">
-          <input
-            type="range"
-            min={minValue}
-            max={maxValue}
-            step={(maxValue - minValue) / 100}
-            value={localValue}
-            onChange={handleSliderChange}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500"
-          />
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              value={localValue.toFixed(2)}
-              onChange={(e) => {
-                const value = parseFloat(e.target.value);
-                if (!isNaN(value)) {
-                  setLocalValue(value);
-                }
-              }}
-              className="flex-1 px-2 py-1 text-sm border rounded"
-            />
-            <span className="text-sm text-gray-500">{node.units || ''}</span>
-          </div>
-        </div>
-
-        {/* Show button when value differs from current intervention (or when not intervened) */}
-        {(!isIntervened || Math.abs(localValue - (intervention ?? 0)) > 0.001) && (
-          <button
-            onClick={handleApplyIntervention}
-            disabled={isComputing}
-            className="w-full py-2 text-sm bg-orange-500 text-white rounded hover:bg-orange-600 disabled:bg-orange-300 transition flex items-center justify-center gap-2"
-          >
-            {isComputing ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Computing...
-              </>
-            ) : (
-              isIntervened ? 'Update Value' : 'Set Value'
-            )}
-          </button>
-        )}
-      </div>
+      )}
 
       {/* Node relationships */}
       <div className="space-y-2">

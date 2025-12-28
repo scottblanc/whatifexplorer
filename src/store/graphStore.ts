@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import type { CausalModel, RenderableDistribution, EffectFunction } from '@/types/causal';
-import { propagateWithSampling, type NodeSamples } from '@/lib/inference';
+import { propagateWithSampling, DEFAULT_SAMPLE_COUNT, type NodeSamples } from '@/lib/inference';
 
 interface CausalGraphStore {
   // Model from LLM
@@ -20,6 +20,9 @@ interface CausalGraphStore {
   // Computed state (from Monte Carlo)
   nodeSamples: NodeSamples;
   nodeDistributions: Map<string, RenderableDistribution>;
+
+  // Settings
+  sampleCount: number;
 
   // UI state
   selectedNodeId: string | null;
@@ -42,6 +45,7 @@ interface CausalGraphStore {
   hoverNode: (nodeId: string | null) => void;
   toggleInsights: () => void;
   updateEdgeEffect: (sourceId: string, targetId: string, effect: EffectFunction) => void;
+  setSampleCount: (count: number) => void;
 
   // Internal
   recompute: () => void;
@@ -57,6 +61,7 @@ export const useCausalGraphStore = create<CausalGraphStore>()(
     interventions: new Map(),
     nodeSamples: {},
     nodeDistributions: new Map(),
+    sampleCount: DEFAULT_SAMPLE_COUNT,
     selectedNodeId: null,
     selectedEdgeId: null,
     hoveredNodeId: null,
@@ -113,6 +118,10 @@ export const useCausalGraphStore = create<CausalGraphStore>()(
     },
     hoverNode: (nodeId) => set({ hoveredNodeId: nodeId }),
     toggleInsights: () => set((state) => ({ showInsights: !state.showInsights })),
+    setSampleCount: (count) => {
+      set({ sampleCount: count });
+      get().recompute();
+    },
 
     // Edge effect update
     updateEdgeEffect: (sourceId, targetId, effect) => {
@@ -132,14 +141,14 @@ export const useCausalGraphStore = create<CausalGraphStore>()(
 
     // Recompute distributions
     recompute: () => {
-      const { model, interventions } = get();
+      const { model, interventions, sampleCount } = get();
       if (!model) return;
 
-      console.log('[Store] Recomputing distributions with', interventions.size, 'interventions');
+      console.log('[Store] Recomputing distributions with', interventions.size, 'interventions,', sampleCount, 'samples');
       const startTime = performance.now();
 
       try {
-        const { samples, distributions } = propagateWithSampling(model, interventions);
+        const { samples, distributions } = propagateWithSampling(model, interventions, sampleCount);
         const elapsed = performance.now() - startTime;
         console.log('[Store] Propagation complete in', elapsed.toFixed(1), 'ms');
         set({ nodeSamples: samples, nodeDistributions: distributions });
@@ -167,3 +176,5 @@ export const useNodeDistribution = (nodeId: string) =>
 
 export const useNodeSamples = (nodeId: string) =>
   useCausalGraphStore((s) => s.nodeSamples[nodeId]);
+
+export const useSampleCount = () => useCausalGraphStore((s) => s.sampleCount);

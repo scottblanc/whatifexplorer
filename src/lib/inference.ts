@@ -8,7 +8,7 @@ import type {
 } from '@/types/causal';
 import { sampleFromDistribution, samplesToKDE, expectedValue } from './distributions';
 
-export const SAMPLE_COUNT = 100;
+export const DEFAULT_SAMPLE_COUNT = 100;
 
 // Default circuit breaker configuration
 // Note: priorWeight was causing effects to dampen at each propagation level
@@ -119,17 +119,36 @@ function applyLinearEffect(
 
 /**
  * Apply multiplicative effect with damping
+ *
+ * The factor represents how much the child scales when parent doubles from baseline.
+ * - factor = 2.0 means child doubles when parent doubles (linear relationship)
+ * - factor = 1.5 means child increases 50% when parent doubles
+ * - factor = 1.0 means no effect
+ *
+ * Formula: multiplier = factor^(log2(parentValue / baseline))
+ * This means: when parent = 2*baseline, multiplier = factor
  */
 function applyMultiplicativeEffect(
   baseValue: number,
   effect: { factor?: number; baseline?: number },
   parentValue: number
 ): number {
-  const factor = effect.factor ?? 1.05;
+  const factor = effect.factor ?? 1.5;
   const baseline = effect.baseline ?? 1;
 
-  // Exponential scaling relative to baseline
-  const rawMultiplier = Math.pow(factor, parentValue / baseline);
+  // Avoid log of zero or negative
+  if (parentValue <= 0 || baseline <= 0) {
+    return baseValue;
+  }
+
+  // Calculate how many "doublings" the parent is from baseline
+  // When parent = baseline, doublings = 0, multiplier = 1
+  // When parent = 2*baseline, doublings = 1, multiplier = factor
+  // When parent = 0.5*baseline, doublings = -1, multiplier = 1/factor
+  const doublings = Math.log2(parentValue / baseline);
+
+  // Apply the scaling factor
+  const rawMultiplier = Math.pow(factor, doublings);
 
   // Cap multiplier to prevent explosion (0.1x to 10x range)
   const dampedMultiplier = Math.min(Math.max(rawMultiplier, 0.1), 10);
@@ -139,24 +158,41 @@ function applyMultiplicativeEffect(
 
 /**
  * Apply threshold effect with smooth sigmoid transition
+ *
+ * The below/above values are sensitivity coefficients (like linear effect):
+ * - below: How strongly parent affects target when parent < cutoff
+ * - above: How strongly parent affects target when parent > cutoff
+ *
+ * This creates a "regime change" where sensitivity shifts at the cutoff.
+ * Example: Risk premium might have low sensitivity to debt below 120% GDP,
+ * but high sensitivity above that threshold.
  */
 function applyThresholdEffect(
   baseValue: number,
   effect: { cutoff?: number; below?: number; above?: number; smoothness?: number },
-  parentValue: number
+  parentValue: number,
+  parentPriorMean: number
 ): number {
-  const cutoff = effect.cutoff ?? 0;
-  const below = effect.below ?? 0;
-  const above = effect.above ?? 0;
+  const cutoff = effect.cutoff ?? parentPriorMean;
+  const below = effect.below ?? 0.1;
+  const above = effect.above ?? 0.5;
   const k = effect.smoothness ?? 2;
 
-  // Sigmoid interpolation
+  // Sigmoid interpolation between below and above sensitivity
   const weight = 1 / (1 + Math.exp(-k * (parentValue - cutoff)));
 
-  // Blend between 'below' and 'above' effects
-  const effectiveDelta = below * (1 - weight) + above * weight;
+  // Blend between 'below' and 'above' sensitivity coefficients
+  const effectiveCoefficient = below * (1 - weight) + above * weight;
 
-  return baseValue + effectiveDelta;
+  // Apply like a linear effect: scale based on parent's deviation from cutoff
+  // (using cutoff as the reference point, not parent mean)
+  const parentDeviation = (parentValue - cutoff) / Math.abs(cutoff || 1);
+
+  // Multiplier approach (like linear effect)
+  const multiplier = 1 + effectiveCoefficient * parentDeviation;
+  const clampedMultiplier = Math.min(Math.max(multiplier, 0.1), 10);
+
+  return baseValue * clampedMultiplier;
 }
 
 /**
@@ -210,7 +246,7 @@ function applyEffectToSample(
         result = applyMultiplicativeEffect(baseValue, effect, parentValue);
         break;
       case 'threshold':
-        result = applyThresholdEffect(baseValue, effect, parentValue);
+        result = applyThresholdEffect(baseValue, effect, parentValue, parentPriorMean);
         break;
       case 'logistic':
         result = applyLogisticEffect(baseValue, effect, parentValue);
@@ -288,10 +324,11 @@ function computeChildSamples(
   node: CausalNode,
   edges: CausalEdge[],
   parentSamples: NodeSamples,
-  nodeMap: Map<string, CausalNode>
+  nodeMap: Map<string, CausalNode>,
+  sampleCount: number
 ): number[] {
   const parentEdges = edges.filter(e => e.target === node.id);
-  const baseSamples = sampleFromDistribution(node.distribution, SAMPLE_COUNT);
+  const baseSamples = sampleFromDistribution(node.distribution, sampleCount);
 
   // For each sample index, apply all parent effects
   return baseSamples.map((baseValue, i) => {
@@ -313,13 +350,14 @@ function computeChildSamples(
  */
 export function propagateWithSampling(
   model: CausalModel,
-  interventions: Map<string, number>
+  interventions: Map<string, number>,
+  sampleCount: number = DEFAULT_SAMPLE_COUNT
 ): PropagationResult {
   const samples: NodeSamples = {};
   const sorted = topologicalSort(model);
   const nodeMap = new Map(model.nodes.map(n => [n.id, n]));
 
-  console.log('>>> [Inference] Propagating with interventions:', [...interventions.entries()]);
+  console.log('>>> [Inference] Propagating with interventions:', [...interventions.entries()], 'samples:', sampleCount);
   console.log('>>> [Inference] Topological order:', sorted.map(n => n.id).join(' -> '));
 
   for (const node of sorted) {
@@ -328,27 +366,29 @@ export function propagateWithSampling(
     if (interventions.has(node.id)) {
       // Intervention: all samples are the fixed value
       const interventionValue = interventions.get(node.id)!;
-      samples[node.id] = Array(SAMPLE_COUNT).fill(interventionValue);
+      samples[node.id] = Array(sampleCount).fill(interventionValue);
       console.log(`>>> [Inference] ${node.id}: INTERVENED to ${interventionValue} (prior was ${priorMean.toFixed(2)})`);
     } else if (node.type === 'exogenous') {
       // Exogenous: sample from prior distribution
-      samples[node.id] = sampleFromDistribution(node.distribution, SAMPLE_COUNT);
-      const mean = samples[node.id].reduce((a, b) => a + b, 0) / SAMPLE_COUNT;
+      samples[node.id] = sampleFromDistribution(node.distribution, sampleCount);
+      const mean = samples[node.id].reduce((a, b) => a + b, 0) / sampleCount;
       console.log(`>>> [Inference] ${node.id}: exogenous, sampled mean=${mean.toFixed(2)} (prior=${priorMean.toFixed(2)})`);
     } else {
       // Endogenous: compute from parents
       const parentEdges = model.edges.filter(e => e.target === node.id);
-      samples[node.id] = computeChildSamples(node, model.edges, samples, nodeMap);
-      const mean = samples[node.id].reduce((a, b) => a + b, 0) / SAMPLE_COUNT;
+      samples[node.id] = computeChildSamples(node, model.edges, samples, nodeMap, sampleCount);
+      const mean = samples[node.id].reduce((a, b) => a + b, 0) / sampleCount;
       console.log(`>>> [Inference] ${node.id}: endogenous, computed mean=${mean.toFixed(2)} (prior=${priorMean.toFixed(2)}) from parents: [${parentEdges.map(e => e.source).join(', ')}]`);
     }
 
-    // Apply circuit breakers
-    samples[node.id] = applyCircuitBreakers(node, samples[node.id]);
+    // Apply circuit breakers (but NOT to intervened nodes - interventions override natural bounds)
+    if (!interventions.has(node.id)) {
+      samples[node.id] = applyCircuitBreakers(node, samples[node.id]);
 
-    // Clamp variance if needed
-    const config = { ...DEFAULT_CIRCUIT_BREAKERS, ...node.circuitBreakers };
-    samples[node.id] = clampVariance(samples[node.id], config);
+      // Clamp variance if needed
+      const config = { ...DEFAULT_CIRCUIT_BREAKERS, ...node.circuitBreakers };
+      samples[node.id] = clampVariance(samples[node.id], config);
+    }
   }
 
   // Convert samples to renderable distributions

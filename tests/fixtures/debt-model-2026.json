@@ -1,0 +1,431 @@
+{
+  "title": "US Federal Debt Overhang Causal Model (2026)",
+  "description": "A structural causal model analyzing the transmission of high US federal debt levels into inflationary pressures and interest rate volatility for the year 2026.",
+  "zones": {
+    "fiscal_dynamics": {
+      "label": "Fiscal & Debt Dynamics",
+      "color": "#e74c3c",
+      "description": "Variables tracking government borrowing and debt levels."
+    },
+    "market_monetary": {
+      "label": "Monetary & Market Transmission",
+      "color": "#3498db",
+      "description": "The mechanism where debt impacts yields and money supply."
+    },
+    "macro_outcomes": {
+      "label": "Macroeconomic Outcomes",
+      "color": "#27ae60",
+      "description": "Final impact on inflation, real rates, and economic growth."
+    }
+  },
+  "nodes": [
+    {
+      "id": "debt_to_gdp",
+      "label": "Debt-to-GDP Ratio",
+      "type": "exogenous",
+      "zone": "fiscal_dynamics",
+      "units": "%",
+      "description": "The ratio of total US federal debt to annual nominal GDP.",
+      "distribution": {
+        "type": "continuous",
+        "dist": "normal",
+        "params": [128, 5]
+      },
+      "shape": "diamond",
+      "circuitBreakers": {
+        "minValue": 100,
+        "maxValue": 160,
+        "priorWeight": 0.1,
+        "maxStdDevRatio": 2
+      }
+    },
+    {
+      "id": "global_risk_appetite",
+      "label": "Global Risk Appetite",
+      "type": "exogenous",
+      "zone": "market_monetary",
+      "units": "index",
+      "description": "Investor willingness to hold sovereign debt vs. private assets.",
+      "distribution": {
+        "type": "continuous",
+        "dist": "normal",
+        "params": [65, 10]
+      },
+      "shape": "diamond",
+      "circuitBreakers": {
+        "minValue": 0,
+        "maxValue": 100,
+        "priorWeight": 0.1,
+        "maxStdDevRatio": 2
+      }
+    },
+    {
+      "id": "fiscal_deficit_path",
+      "label": "Annual Fiscal Deficit",
+      "type": "exogenous",
+      "zone": "fiscal_dynamics",
+      "units": "% of GDP",
+      "description": "Projected annual shortfall in the federal budget.",
+      "distribution": {
+        "type": "continuous",
+        "dist": "normal",
+        "params": [6.8, 1.2]
+      },
+      "shape": "diamond",
+      "circuitBreakers": {
+        "minValue": 3,
+        "maxValue": 15,
+        "priorWeight": 0.1,
+        "maxStdDevRatio": 2
+      }
+    },
+    {
+      "id": "debt_sustainability_gate",
+      "label": "Debt Sustainability Signal",
+      "type": "endogenous",
+      "zone": "fiscal_dynamics",
+      "units": "index",
+      "description": "A derived metric evaluating if debt levels are entering a non-linear risk zone.",
+      "distribution": {
+        "type": "bounded",
+        "min": 0,
+        "max": 100,
+        "mode": 60
+      },
+      "shape": "octagon",
+      "circuitBreakers": {
+        "minValue": 0,
+        "maxValue": 100,
+        "priorWeight": 0.1,
+        "maxStdDevRatio": 2
+      }
+    },
+    {
+      "id": "treasury_issuance_volume",
+      "label": "New Treasury Issuance",
+      "type": "endogenous",
+      "zone": "market_monetary",
+      "units": "$T",
+      "description": "Total gross amount of new Treasury securities entering the market.",
+      "distribution": {
+        "type": "continuous",
+        "dist": "normal",
+        "params": [2.2, 0.4]
+      },
+      "shape": "circle",
+      "circuitBreakers": {
+        "minValue": 1,
+        "maxValue": 5,
+        "priorWeight": 0.1,
+        "maxStdDevRatio": 2
+      }
+    },
+    {
+      "id": "sovereign_risk_premium",
+      "label": "Sovereign Risk Premium",
+      "type": "endogenous",
+      "zone": "market_monetary",
+      "units": "bps",
+      "description": "The extra yield investors demand to hold US debt over a theoretical risk-free rate.",
+      "distribution": {
+        "type": "continuous",
+        "dist": "normal",
+        "params": [45, 15]
+      },
+      "shape": "circle",
+      "circuitBreakers": {
+        "minValue": 0,
+        "maxValue": 200,
+        "priorWeight": 0.1,
+        "maxStdDevRatio": 2
+      }
+    },
+    {
+      "id": "ten_year_yield",
+      "label": "10-Year Treasury Yield",
+      "type": "endogenous",
+      "zone": "market_monetary",
+      "units": "%",
+      "description": "Benchmark long-term interest rate for the US economy.",
+      "distribution": {
+        "type": "continuous",
+        "dist": "normal",
+        "params": [4.4, 0.6]
+      },
+      "shape": "circle",
+      "circuitBreakers": {
+        "minValue": 1,
+        "maxValue": 8,
+        "priorWeight": 0.1,
+        "maxStdDevRatio": 2
+      }
+    },
+    {
+      "id": "monetary_base_expansion",
+      "label": "Money Supply (M2) Growth",
+      "type": "endogenous",
+      "zone": "market_monetary",
+      "units": "%",
+      "description": "Annual growth in money supply, potentially driven by debt monetization.",
+      "distribution": {
+        "type": "continuous",
+        "dist": "normal",
+        "params": [4.5, 1.5]
+      },
+      "shape": "circle",
+      "circuitBreakers": {
+        "minValue": -2,
+        "maxValue": 25,
+        "priorWeight": 0.1,
+        "maxStdDevRatio": 2
+      }
+    },
+    {
+      "id": "inflation_expectations",
+      "label": "Inflation Expectations",
+      "type": "endogenous",
+      "zone": "macro_outcomes",
+      "units": "%",
+      "description": "Forward-looking consumer and investor expectations for CPI.",
+      "distribution": {
+        "type": "continuous",
+        "dist": "normal",
+        "params": [2.6, 0.5]
+      },
+      "shape": "circle",
+      "circuitBreakers": {
+        "minValue": 1,
+        "maxValue": 10,
+        "priorWeight": 0.1,
+        "maxStdDevRatio": 2
+      }
+    },
+    {
+      "id": "headline_cpi",
+      "label": "Headline CPI Inflation",
+      "type": "endogenous",
+      "zone": "macro_outcomes",
+      "units": "%",
+      "description": "The final consumer price index growth rate for 2026.",
+      "distribution": {
+        "type": "continuous",
+        "dist": "normal",
+        "params": [3.1, 0.8]
+      },
+      "shape": "circle",
+      "circuitBreakers": {
+        "minValue": -1,
+        "maxValue": 12,
+        "priorWeight": 0.1,
+        "maxStdDevRatio": 2
+      }
+    },
+    {
+      "id": "real_interest_rates",
+      "label": "Real Interest Rates",
+      "type": "terminal",
+      "zone": "macro_outcomes",
+      "units": "%",
+      "description": "The 10-Year Yield adjusted for expected inflation.",
+      "distribution": {
+        "type": "continuous",
+        "dist": "normal",
+        "params": [1.4, 0.5]
+      },
+      "shape": "rectangle",
+      "circuitBreakers": {
+        "minValue": -5,
+        "maxValue": 6,
+        "priorWeight": 0.1,
+        "maxStdDevRatio": 2
+      }
+    },
+    {
+      "id": "gdp_growth",
+      "label": "GDP Growth Rate",
+      "type": "terminal",
+      "zone": "macro_outcomes",
+      "units": "%",
+      "description": "Real annual economic growth.",
+      "distribution": {
+        "type": "continuous",
+        "dist": "normal",
+        "params": [2.1, 0.7]
+      },
+      "shape": "rectangle",
+      "circuitBreakers": {
+        "minValue": -5,
+        "maxValue": 8,
+        "priorWeight": 0.1,
+        "maxStdDevRatio": 2
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "debt_to_gdp",
+      "target": "debt_sustainability_gate",
+      "relationship": "causes",
+      "style": "solid",
+      "weight": "normal",
+      "effect": {
+        "type": "linear",
+        "coefficient": 0.8
+      },
+      "description": "Higher debt levels directly increase the sustainability risk score."
+    },
+    {
+      "source": "debt_sustainability_gate",
+      "target": "sovereign_risk_premium",
+      "relationship": "causes",
+      "style": "solid",
+      "weight": "strong",
+      "effect": {
+        "type": "threshold",
+        "cutoff": 75,
+        "below": 0.2,
+        "above": 0.8,
+        "smoothness": 2
+      },
+      "description": "When sustainability scores cross a threshold, the risk premium jumps non-linearly."
+    },
+    {
+      "source": "global_risk_appetite",
+      "target": "sovereign_risk_premium",
+      "relationship": "causes",
+      "style": "dashed",
+      "weight": "normal",
+      "effect": {
+        "type": "linear",
+        "coefficient": -0.4
+      },
+      "description": "Higher global appetite for risk reduces the premium required for US debt."
+    },
+    {
+      "source": "fiscal_deficit_path",
+      "target": "treasury_issuance_volume",
+      "relationship": "causes",
+      "style": "solid",
+      "weight": "strong",
+      "effect": {
+        "type": "linear",
+        "coefficient": 1
+      },
+      "description": "Deficits must be financed by issuing new Treasury securities."
+    },
+    {
+      "source": "treasury_issuance_volume",
+      "target": "ten_year_yield",
+      "relationship": "causes",
+      "style": "solid",
+      "weight": "normal",
+      "effect": {
+        "type": "linear",
+        "coefficient": 0.3
+      },
+      "description": "Higher supply of debt typically puts upward pressure on yields (crowding out)."
+    },
+    {
+      "source": "sovereign_risk_premium",
+      "target": "ten_year_yield",
+      "relationship": "causes",
+      "style": "solid",
+      "weight": "strong",
+      "effect": {
+        "type": "linear",
+        "coefficient": 0.6
+      },
+      "description": "Risk premiums are directly baked into the long-term yield."
+    },
+    {
+      "source": "ten_year_yield",
+      "target": "monetary_base_expansion",
+      "relationship": "causes",
+      "style": "solid",
+      "weight": "normal",
+      "effect": {
+        "type": "linear",
+        "coefficient": 0.2
+      },
+      "description": "Rising rates increase debt servicing costs, potentially forcing 'fiscal dominance' where the Fed eases to assist the Treasury."
+    },
+    {
+      "source": "debt_to_gdp",
+      "target": "inflation_expectations",
+      "relationship": "causes",
+      "style": "solid",
+      "weight": "normal",
+      "effect": {
+        "type": "linear",
+        "coefficient": 0.4
+      },
+      "description": "High debt overhang signals potential future inflation (devaluation) to the public."
+    },
+    {
+      "source": "monetary_base_expansion",
+      "target": "headline_cpi",
+      "relationship": "causes",
+      "style": "solid",
+      "weight": "strong",
+      "effect": {
+        "type": "multiplicative",
+        "factor": 1.5,
+        "baseline": 4.5
+      },
+      "description": "Rapid growth in money supply compounds inflationary pressures over time."
+    },
+    {
+      "source": "inflation_expectations",
+      "target": "headline_cpi",
+      "relationship": "causes",
+      "style": "solid",
+      "weight": "strong",
+      "effect": {
+        "type": "linear",
+        "coefficient": 0.7
+      },
+      "description": "Self-fulfilling prophecy where expected inflation drives actual price-setting behavior."
+    },
+    {
+      "source": "headline_cpi",
+      "target": "real_interest_rates",
+      "relationship": "causes",
+      "style": "solid",
+      "weight": "strong",
+      "effect": {
+        "type": "linear",
+        "coefficient": -1
+      },
+      "description": "Actual inflation erodes the real value of interest, lowering real rates."
+    },
+    {
+      "source": "ten_year_yield",
+      "target": "real_interest_rates",
+      "relationship": "causes",
+      "style": "solid",
+      "weight": "strong",
+      "effect": {
+        "type": "linear",
+        "coefficient": 1
+      },
+      "description": "Higher nominal yields contribute positively to real rates."
+    },
+    {
+      "source": "ten_year_yield",
+      "target": "gdp_growth",
+      "relationship": "causes",
+      "style": "solid",
+      "weight": "normal",
+      "effect": {
+        "type": "linear",
+        "coefficient": -0.3
+      },
+      "description": "Higher cost of capital reduces private investment and consumption growth."
+    }
+  ],
+  "keyInsights": [
+    "The model identifies a critical sustainability threshold (Gatekeeper) where markets shift from viewing US debt as safe to demanding a sovereign risk premium.",
+    "A 'Fiscal Dominance' loop exists where high interest rates increase debt servicing costs, potentially pressuring the money supply growth to keep the government solvent, which fuels inflation.",
+    "2026 inflation is driven more by the combination of long-term debt expectations and money supply growth than by temporary supply shocks."
+  ]
+}

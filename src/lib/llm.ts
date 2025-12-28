@@ -279,30 +279,52 @@ Example realistic values:
 
 ### Linear (most common - use for direct proportional relationships)
 When to use: Direct cause-effect where changes in parent proportionally affect target
-Examples: Interest rates → borrowing costs, Education → income, Screen time → sleep quality
+Key test: "If parent doubles, does effect roughly double?" → use linear
+Examples across domains:
+- Economics: Interest rates → borrowing costs, wages → consumer spending
+- Health: Drug dosage → blood concentration, exercise hours → calories burned
+- Engineering: Load → stress, voltage → current
+- Social: Study hours → test scores, marketing spend → awareness
+ALSO use for derived ratios (any X/Y calculation): BMI, debt-to-GDP, efficiency metrics, conversion rates
 Format: { "type": "linear", "coefficient": 0.3 }
 - coefficient: Sensitivity/coupling strength (0.0 to 1.0 typical range)
-  - 0.0 = no coupling (parent has no effect on target)
-  - 0.3 = moderate coupling (if parent deviates 10% from baseline, target moves 3%)
-  - 0.5 = strong coupling (target moves half as much as parent deviates)
+  - 0.3 = moderate (if parent deviates 10% from mean, target moves 3%)
   - 1.0 = tight coupling (target moves proportionally with parent)
-  - Use NEGATIVE values for inverse relationships (e.g., -0.3 means parent increase causes target decrease)
-- saturation: Optional cap on deviation magnitude (e.g., 2.0 limits effect to ±200%)
+  - Use NEGATIVE values for inverse relationships (e.g., -0.3)
+- saturation: Optional cap on deviation magnitude
 
-### Multiplicative (use for percentage-based or compounding effects)
-When to use: Effects that scale proportionally, compound growth, percentage changes
-Examples: Investment returns, inflation multipliers, productivity scaling
-Format: { "type": "multiplicative", "factor": 1.05, "baseline": 50 }
-- factor: Multiplier applied exponentially (keep close to 1: 0.9 to 1.2)
-- baseline: CRITICAL - Set this to the parent node's prior mean! The formula is factor^(parent/baseline), so baseline=1 with large parent values causes explosion. Example: if parent has mean=100, set baseline=100
+### Multiplicative (use ONLY for compound/exponential processes)
+When to use: Effects that compound or grow exponentially over time
+Key test: "Does each unit of parent multiply (not add to) the effect?" → use multiplicative
+Examples across domains:
+- Biology: Viral spread, bacterial growth, population dynamics
+- Finance: Compound interest, inflation erosion
+- Learning: Skill acquisition curves, network effects
+- Physics: Radioactive decay, signal attenuation
+DO NOT use for: Simple ratios, derived metrics, or any X/Y calculation (use linear instead!)
+Format: { "type": "multiplicative", "factor": 2.0, "baseline": 50 }
+- factor: How much child scales when parent DOUBLES from baseline
+  - factor = 2.0 means child doubles when parent doubles
+  - factor = 1.5 means child increases 50% when parent doubles
+- baseline: CRITICAL - Set this to the parent node's prior mean!
 
-### Threshold (use for step changes or regime switches)
-When to use: Behavior changes above/below a critical value, policy triggers
-Examples: Recession thresholds, regulatory limits, capacity constraints
-Format: { "type": "threshold", "cutoff": 5.0, "below": 0.2, "above": 0.8, "smoothness": 2 }
-- cutoff: The critical value where behavior changes
-- below/above: Effect values on each side of cutoff
-- smoothness: How gradual the transition is (higher = sharper)
+### Threshold (use for regime switches where sensitivity changes)
+When to use: Sensitivity to parent changes at a critical value (e.g., risk becomes acute above a threshold)
+Examples: Debt sustainability thresholds, capacity limits, policy triggers, market stress levels
+Format: { "type": "threshold", "cutoff": 120, "below": 0.5, "above": 2.5, "smoothness": 2 }
+- cutoff: The critical value where sensitivity regime changes
+- below: Sensitivity coefficient when parent < cutoff (like linear coefficient)
+- above: Sensitivity coefficient when parent > cutoff (like linear coefficient)
+- smoothness: How gradual the transition between regimes (higher = sharper switch)
+IMPORTANT: Choose coefficients based on threshold severity:
+- **Subtle** (0.3-0.8): Minor sensitivity differences, soft preferences
+- **Moderate** (0.8-2.0): Noticeable regime changes, risk premiums, congestion
+- **Sharp** (2.0-5.0): Capacity limits, policy triggers, stress thresholds
+- **Near-binary** (5.0-10.0): System failures, safety limits, breaking points
+- **Catastrophic** (10.0+): Structural collapse, cascading failures, point-of-no-return
+Example: Debt-to-GDP at 120% (moderate): below=0.5, above=1.5
+Example: Server capacity at 90% (sharp): below=0.3, above=4.0
+Example: Bridge load at 100% (catastrophic): below=0.1, above=12.0
 
 ### Logistic (use for probability/binary outcome effects)
 When to use: Affects likelihood of binary outcomes, risk factors
@@ -407,5 +429,127 @@ export async function generateCausalModel(
   } catch (e) {
     console.error('Failed to parse LLM response:', jsonText);
     throw new Error(`Failed to parse causal model: ${e instanceof Error ? e.message : 'Unknown error'}`);
+  }
+}
+
+const RECALIBRATION_PROMPT = `You are a causal inference expert reviewing a sensitivity analysis of a causal model. The analysis shows how interventions on input nodes affect downstream nodes.
+
+Your task is to recalibrate the model's edge effect coefficients to address identified issues:
+
+1. **Bottleneck Warnings** (HIGHEST PRIORITY): If a 50% input change produces <10% terminal output change, there's a propagation bottleneck. Look at the suspected bottleneck node and increase coefficients on edges leading to/from it.
+
+2. **Weak Effects**: If an input change produces <1% downstream effect, the coefficient chain is too weak. Increase coefficients along the path.
+
+3. **Asymmetric Effects**: If increases and decreases have very different effect magnitudes, check for:
+   - Threshold effects that only activate in one direction - may need higher coefficients on both sides
+   - Circuit breakers clamping values
+   - Coefficients that should be larger
+
+4. **Strong Effects**: Effects >30% might be too strong and could cause instability. Consider dampening.
+
+## Rules for Recalibration:
+- Linear coefficients should typically be 0.3-0.8 for meaningful propagation
+- Negative coefficients for inverse relationships
+- Threshold effects (choose based on severity):
+  - Subtle (0.3-0.8): Minor sensitivity differences
+  - Moderate (0.8-2.0): Noticeable regime changes
+  - Sharp (2.0-5.0): Capacity limits, policy triggers
+  - Near-binary (5.0-10.0): System failures, breaking points
+  - Catastrophic (10.0+): Structural collapse
+  - If coefficients are too small for the domain, increase them to match severity
+- Multiplicative factors: 1.5-2.5 for doubling effects
+
+Return a JSON object with ONLY the edges that need changes:
+{
+  "changes": [
+    {
+      "source": "node_id",
+      "target": "node_id",
+      "reason": "Brief explanation",
+      "newEffect": { "type": "linear", "coefficient": 0.6 }
+    }
+  ],
+  "summary": "1-2 sentence summary of changes made"
+}
+
+Respond ONLY with valid JSON. No markdown code blocks.`;
+
+export async function recalibrateModel(
+  model: CausalModel,
+  sensitivityReport: string,
+  apiKey: string
+): Promise<{ model: CausalModel; summary: string; changes: Array<{ source: string; target: string; reason: string }> }> {
+  console.log('[LLM] Recalibrating model based on sensitivity analysis');
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const llm = genAI.getGenerativeModel({
+    model: 'gemini-2.0-flash',
+    systemInstruction: RECALIBRATION_PROMPT,
+  });
+
+  const prompt = `Here is the current causal model:
+
+\`\`\`json
+${JSON.stringify(model, null, 2)}
+\`\`\`
+
+Here is the sensitivity analysis report:
+
+${sensitivityReport}
+
+Based on this analysis, suggest edge coefficient changes to fix weak or asymmetric effects. Return JSON only.`;
+
+  const result = await llm.generateContent(prompt);
+  let jsonText = result.response.text().trim();
+
+  // Remove markdown code blocks if present
+  if (jsonText.startsWith('```')) {
+    jsonText = jsonText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+  }
+
+  try {
+    const response = JSON.parse(jsonText) as {
+      changes: Array<{
+        source: string;
+        target: string;
+        reason: string;
+        newEffect: CausalEdge['effect'];
+      }>;
+      summary: string;
+    };
+
+    // Apply changes to model
+    let updatedModel = { ...model };
+    const appliedChanges: Array<{ source: string; target: string; reason: string }> = [];
+
+    for (const change of response.changes) {
+      const edgeIndex = updatedModel.edges.findIndex(
+        e => e.source === change.source && e.target === change.target
+      );
+
+      if (edgeIndex >= 0) {
+        updatedModel = {
+          ...updatedModel,
+          edges: updatedModel.edges.map((edge, i) =>
+            i === edgeIndex ? { ...edge, effect: change.newEffect } : edge
+          ),
+        };
+        appliedChanges.push({
+          source: change.source,
+          target: change.target,
+          reason: change.reason,
+        });
+        console.log(`[LLM] Updated edge ${change.source} -> ${change.target}: ${change.reason}`);
+      }
+    }
+
+    return {
+      model: updatedModel,
+      summary: response.summary,
+      changes: appliedChanges,
+    };
+  } catch (e) {
+    console.error('Failed to parse recalibration response:', jsonText);
+    throw new Error(`Failed to parse recalibration: ${e instanceof Error ? e.message : 'Unknown error'}`);
   }
 }

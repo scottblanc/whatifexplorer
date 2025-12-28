@@ -6,15 +6,32 @@ import NodeInspector from '@/components/NodeInspector';
 import EdgeInspector from '@/components/EdgeInspector';
 import QueryInput from '@/components/QueryInput';
 import InsightsPanel from '@/components/InsightsPanel';
+import SensitivityPanel from '@/components/SensitivityPanel';
 import { useCausalGraphStore } from '@/store/graphStore';
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showSensitivityPanel, setShowSensitivityPanel] = useState(false);
+  const [copied, setCopied] = useState(false);
   const model = useCausalGraphStore((s) => s.model);
   const error = useCausalGraphStore((s) => s.error);
   const interventions = useCausalGraphStore((s) => s.interventions);
   const clearAllInterventions = useCausalGraphStore((s) => s.clearAllInterventions);
   const selectedEdgeId = useCausalGraphStore((s) => s.selectedEdgeId);
+  const sampleCount = useCausalGraphStore((s) => s.sampleCount);
+  const setSampleCount = useCausalGraphStore((s) => s.setSampleCount);
+
+  const handleCopyJson = async () => {
+    if (!model) return;
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(model, null, 2));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -48,20 +65,36 @@ export default function Home() {
               {/* Toolbar */}
               {model && (
                 <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                  <div>
+                  <div className="flex items-center gap-2">
                     <span className="font-medium text-gray-900">{model.title}</span>
-                    <span className="ml-2 text-sm text-gray-500">
+                    <span className="text-sm text-gray-500">
                       ({model.nodes.length} nodes, {model.edges.length} edges)
                     </span>
                   </div>
-                  {interventions.size > 0 && (
-                    <button
-                      onClick={clearAllInterventions}
-                      className="text-sm text-orange-600 hover:text-orange-700"
-                    >
-                      Clear all interventions ({interventions.size})
-                    </button>
-                  )}
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-gray-500">Samples:</label>
+                      <select
+                        value={sampleCount}
+                        onChange={(e) => setSampleCount(Number(e.target.value))}
+                        className="text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white"
+                      >
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                        <option value={200}>200</option>
+                        <option value={500}>500</option>
+                        <option value={1000}>1000</option>
+                      </select>
+                    </div>
+                    {interventions.size > 0 && (
+                      <button
+                        onClick={clearAllInterventions}
+                        className="text-sm text-orange-600 hover:text-orange-700"
+                      >
+                        Clear all interventions ({interventions.size})
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -150,6 +183,32 @@ export default function Home() {
 
           {/* Inspector Sidebar */}
           <div className="w-72 flex-shrink-0">
+            {/* Action Buttons */}
+            {model && (
+              <div className="flex gap-2 mb-3">
+                <button
+                  onClick={() => setShowExportModal(true)}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition"
+                  title="Export model JSON"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  Export
+                </button>
+                <button
+                  onClick={() => setShowSensitivityPanel(true)}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition"
+                  title="Run sensitivity analysis"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  Analyze
+                </button>
+              </div>
+            )}
+
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 sticky top-6 overflow-hidden">
               <div className="px-3 py-2 border-b border-gray-200">
                 <h2 className="font-medium text-gray-900 text-sm">
@@ -174,6 +233,48 @@ export default function Home() {
           </p>
         </div>
       </footer>
+
+      {/* Export Modal */}
+      {showExportModal && model && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[80vh] flex flex-col">
+            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="font-medium text-gray-900">Model JSON Export</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCopyJson}
+                  className={`px-3 py-1 text-sm rounded ${
+                    copied
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {copied ? 'Copied!' : 'Copy to clipboard'}
+                </button>
+                <button
+                  onClick={() => setShowExportModal(false)}
+                  className="p-1 text-gray-500 hover:text-gray-700"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="p-4 overflow-auto flex-1">
+              <pre className="text-xs font-mono bg-gray-50 p-4 rounded border border-gray-200 overflow-x-auto">
+                {JSON.stringify(model, null, 2)}
+              </pre>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sensitivity Analysis Panel */}
+      <SensitivityPanel
+        isOpen={showSensitivityPanel}
+        onClose={() => setShowSensitivityPanel(false)}
+      />
     </main>
   );
 }

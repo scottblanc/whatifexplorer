@@ -117,7 +117,9 @@ export default function EdgeInspector() {
   }
 
   return (
-    <div className="p-4 space-y-4 overflow-y-auto max-h-full">
+    <div className="flex flex-col h-full max-h-full">
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -354,30 +356,33 @@ export default function EdgeInspector() {
         )}
       </div>
 
-      {/* Apply Button */}
-      {hasChanges && (
-        <button
-          onClick={handleApplyChanges}
-          disabled={isComputing}
-          className="w-full py-2 text-sm bg-cyan-500 text-white rounded hover:bg-cyan-600 disabled:bg-cyan-300 transition flex items-center justify-center gap-2"
-        >
-          {isComputing ? (
-            <>
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Computing...
-            </>
-          ) : (
-            'Apply Changes'
-          )}
-        </button>
-      )}
-
       {/* Edge metadata */}
       <div className="text-xs text-gray-400 space-y-1 pt-2 border-t">
         <div>Relationship: {edge.relationship}</div>
         <div>Style: {edge.style} | Weight: {edge.weight}</div>
         {edge.label && <div>Label: {edge.label}</div>}
       </div>
+      </div>
+
+      {/* Sticky Footer with Apply Button */}
+      {hasChanges && (
+        <div className="flex-shrink-0 p-3 border-t border-gray-200 bg-white">
+          <button
+            onClick={handleApplyChanges}
+            disabled={isComputing}
+            className="w-full py-2 text-sm bg-cyan-500 text-white rounded hover:bg-cyan-600 disabled:bg-cyan-300 transition flex items-center justify-center gap-2"
+          >
+            {isComputing ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Computing...
+              </>
+            ) : (
+              'Apply Changes'
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
