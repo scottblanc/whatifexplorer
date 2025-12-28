@@ -46,13 +46,21 @@ The codebase separates concerns into three layers: React components handle user 
 
 ### Components
 
-The UI is built from five React components. CausalGraph handles the visualization—it dynamically loads dagre for layout computation, then uses D3 to render the SVG with nodes, edges, and a zone legend. When users click nodes, the component notifies the store, which updates the selection state and triggers the NodeInspector to appear.
+The UI is built from seven primary React components.
 
-NodeInspector is where users interact with individual variables. It displays the node's description and shows its probability distribution as a density curve. The intervention slider lets users set a value, and clicking "Set Value" triggers the inference engine to propagate effects through the graph.
+**CausalGraph** handles the visualization—it dynamically loads dagre for layout computation, then uses D3 to render the SVG with nodes, edges, and a zone legend. When users click nodes or edges, the component notifies the store, which updates the selection state and triggers the appropriate inspector.
 
-QueryInput handles model generation—users type a causal question, click Generate, and wait for the LLM to return a model. The component manages loading state and error handling, then hands the resulting model to the store.
+**NodeInspector** is where users interact with individual variables. It displays the node's description and shows its probability distribution as a density curve. The intervention slider lets users set a value, and clicking "Set Value" triggers the inference engine to propagate effects through the graph. Terminal nodes show a read-only view since they have no downstream effects to propagate.
 
-DistributionChart and InsightsPanel round out the UI. The chart renders small KDE curves with percentile markers. The insights panel shows LLM-generated observations about the causal structure.
+**EdgeInspector** allows direct editing of causal effect functions. Users can switch between effect types (linear, multiplicative, threshold, logistic) and adjust parameters. Changes apply immediately with a sticky "Apply Changes" button that remains visible during scrolling.
+
+**SensitivityPanel** runs comprehensive sensitivity analysis across all exogenous nodes. It tests interventions at ±25% and ±50%, identifies weak effects, asymmetric responses, and bottlenecks, and offers AI-powered recalibration to fix issues.
+
+**QueryInput** handles model generation—users type a causal question, click Generate, and wait for the LLM to return a model. The component manages loading state and error handling, then hands the resulting model to the store.
+
+**DistributionChart** renders probability distributions as small KDE curves with percentile markers (p5, mean, p95). Used in NodeInspector to show how a variable's uncertainty has shifted.
+
+**InsightsPanel** displays LLM-generated observations about the causal structure—key relationships, potential feedback loops, and notable thresholds in the model.
 
 ### State Management
 
@@ -65,3 +73,13 @@ When interventions change, the store automatically triggers recomputation. The i
 The graph renders as SVG using D3 for element manipulation and dagre for layout. Dagre computes node positions that minimize edge crossings while maintaining a top-to-bottom causal flow—causes appear above their effects.
 
 The rendering rebuilds the entire SVG on each update, layering elements in order: arrow marker definitions, the zone legend bar, edge paths with arrowheads, and finally node groups containing shapes and labels. Node shapes communicate type at a glance—parallelograms for exogenous inputs, rounded rectangles for intermediate variables, hard rectangles for terminal outcomes. Selected and intervened nodes get visual emphasis through borders, shadows, and color changes.
+
+### API Routes
+
+Two Next.js API routes handle server-side LLM communication:
+
+**`/api/generate`** receives a natural language query and returns a complete causal model. The route calls Gemini with a detailed system prompt specifying the SCM schema, effect type guidelines, and validation requirements. The response is validated and repaired if needed (fixing disconnected components, correcting node types).
+
+**`/api/recalibrate`** receives a model and sensitivity analysis report, then returns coefficient adjustments. The LLM analyzes bottlenecks and weak effects, suggesting specific edge changes. The route applies these changes and returns the updated model along with a summary of modifications.
+
+Both routes keep the Gemini API key server-side while allowing the client to trigger LLM operations.

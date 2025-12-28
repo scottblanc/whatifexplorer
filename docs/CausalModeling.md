@@ -146,41 +146,58 @@ Parameters:
 ### Multiplicative Effects
 
 ```
-child = base × factor^(parent/baseline)
+doublings = log₂(parent / baseline)
+multiplier = factor^doublings
+child = base × multiplier
 ```
 
-For relationships where the effect scales rather than shifts—changes multiply the outcome rather than adding to it.
+For relationships where the effect scales rather than shifts—the `factor` represents how much the child scales when the parent doubles from its baseline.
 
 Use for: amplification, compounding, confidence effects
 - Consumer confidence → spending (confidence amplifies spending)
 - Risk perception → investment (fear multiplies caution)
 - Network effects → adoption (each user multiplies value)
+- Compound growth effects (interest, viral spread)
 
 Parameters:
-- `factor`: multiplicative strength (>1 amplifies, <1 dampens)
-- `baseline`: parent value that produces no scaling (factor^0 = 1)
+- `factor`: how much child scales when parent doubles (e.g., 2.0 means child doubles when parent doubles)
+- `baseline`: reference parent value (typically the prior mean) where multiplier = 1
 
-The multiplier is capped to 0.1×–10× to prevent numerical explosion.
+The multiplier is capped to 0.5×–2× with damping to prevent numerical explosion while preserving relative ordering of samples.
 
 ### Threshold Effects
 
 ```
-child = base + below × (1 - σ) + above × σ
-where σ = sigmoid(smoothness × (parent - cutoff))
+multiplier = 1 + coefficient × (parent - cutoff) / |cutoff|
+where coefficient = below × (1 - σ) + above × σ
+and σ = sigmoid(smoothness × (parent - cutoff))
 ```
 
-For regime changes—relationships that behave differently above and below a threshold.
+For regime changes—relationships that behave differently above and below a threshold. The `below` and `above` parameters are sensitivity coefficients that determine how strongly the child responds to parent deviations from the cutoff in each regime.
 
 Use for: tipping points, phase transitions, policy thresholds
-- Unemployment → inflation (Phillips curve has a threshold)
-- Stress → crisis (systems absorb small shocks, break under large ones)
+- Debt-to-GDP → risk premium (markets react more sharply above sustainability thresholds)
+- Server load → response time (graceful below capacity, exponential degradation above)
 - Temperature → ice melt (phase transition at 0°C)
 
 Parameters:
-- `cutoff`: threshold value
-- `below`: effect when parent is below cutoff
-- `above`: effect when parent is above cutoff
+- `cutoff`: threshold value where regime changes
+- `below`: sensitivity coefficient when parent < cutoff
+- `above`: sensitivity coefficient when parent > cutoff
 - `smoothness`: how sharp the transition is (higher = sharper)
+
+**Choosing Coefficients by Severity:**
+
+| Regime | Range | Use For |
+|--------|-------|---------|
+| Subtle | 0.3-0.8 | Minor sensitivity differences, soft preferences |
+| Moderate | 0.8-2.0 | Noticeable regime changes, risk premiums, congestion |
+| Sharp | 2.0-5.0 | Capacity limits, policy triggers, stress thresholds |
+| Near-binary | 5.0-10.0 | System failures, safety limits, breaking points |
+| Catastrophic | 10.0+ | Structural collapse, cascading failures, point-of-no-return |
+
+Example: Debt-to-GDP at 120% (moderate regime change): `below=0.5, above=1.5`
+Example: Bridge load at 100% capacity (catastrophic): `below=0.1, above=12.0`
 
 ### Logistic Effects
 
@@ -283,3 +300,43 @@ The LLM is prompted to produce models that are:
 - **Coherent**: The causal story makes sense to domain experts
 
 This is an art more than a science—prompt engineering to get consistently good models is ongoing work.
+
+## Sensitivity Analysis
+
+Sensitivity analysis tests how changes to exogenous (input) nodes propagate through the model to affect terminal (output) nodes. This helps identify:
+
+1. **Strong effects**: Pathways where small input changes produce large output changes
+2. **Weak effects**: Pathways where input changes barely register in outputs (may indicate coefficient problems)
+3. **Asymmetric effects**: Pathways where increases and decreases have different magnitudes (common with threshold effects)
+4. **Bottlenecks**: Points where signal gets attenuated, preventing input changes from reaching outputs
+
+### How It Works
+
+The analysis runs interventions at ±25% and ±50% of each exogenous node's prior mean, then measures the resulting changes in all downstream nodes:
+
+1. Compute baseline distributions with no interventions
+2. For each exogenous node and each intervention level:
+   - Set the intervention value
+   - Run Monte Carlo propagation
+   - Compare resulting distributions to baseline
+   - Record both percentage and absolute changes
+3. Aggregate results to identify patterns
+
+### Bottleneck Detection
+
+A bottleneck occurs when a large input change (50%) produces a small terminal output change (<10%). The analysis traces the causal path to identify the intermediate node with the smallest change—this is likely where the signal is being lost.
+
+Common causes:
+- Threshold effect coefficients too small for the domain
+- Multiplicative effects with factors too close to 1.0
+- Circuit breakers clamping values before they can propagate
+
+### AI Recalibration
+
+When sensitivity analysis identifies issues, the "Recalibrate with AI" feature sends the analysis report to an LLM along with the current model. The LLM suggests specific edge coefficient changes to fix:
+
+- Weak effects by increasing coefficients along the path
+- Asymmetric effects by adjusting threshold or multiplicative parameters
+- Bottlenecks by strengthening the weakest link in the chain
+
+The suggested changes are applied automatically, and the analysis re-runs to verify improvement.
